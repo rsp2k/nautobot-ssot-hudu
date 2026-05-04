@@ -53,10 +53,21 @@ Run-time options (dry-run, scope filters) are exposed as Job parameters.
 
 ## Development
 
+For static checks:
+
 ```bash
 uv sync --extra dev
 uv run pytest
 uv run ruff check
+```
+
+For end-to-end testing against a real Nautobot instance, see `development/README.md` — a self-contained 4-container stack (postgres + redis + nautobot-web + nautobot-worker) with the plugin source bind-mounted for hot-reload and a seed script that creates synthetic Tenants + a Hudu SecretsGroup.
+
+```bash
+cd development/
+cp .env.example .env  &&  $EDITOR .env
+make build && make up
+make seed
 ```
 
 ## License
