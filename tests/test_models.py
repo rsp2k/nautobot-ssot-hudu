@@ -7,6 +7,7 @@ real model definitions but stub out Nautobot framework imports (see
 """
 
 import pytest
+from pydantic import ValidationError
 
 from nautobot_ssot_hudu.diffsync.models.company import Company, HuduCompany
 
@@ -39,7 +40,7 @@ class TestCompany:
         assert c.description == "Roadrunner-tracking."
 
     def test_construction_rejects_missing_name(self) -> None:
-        with pytest.raises(Exception):  # pydantic.ValidationError
+        with pytest.raises(ValidationError):
             Company()
 
 
