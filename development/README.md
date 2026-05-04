@@ -81,11 +81,9 @@ docker compose up -d
 
 Alternative: bake the chown into an init container. Not done here for simplicity.
 
-### 3. `dryrun` (framework) vs `dry_run` (ours)
+### 3. `dryrun` (framework) vs `dry_run` (ours) — *fixed*
 
-The SSoT framework's `DataTarget` already provides a `dryrun` Job parameter. Our Job class also declares `dry_run`, so the UI shows **both** checkboxes side-by-side. They're checked by default; only the framework's `dryrun` actually gates the writeback. Our `dry_run` is decorative.
-
-To clean up: remove `dry_run = BooleanVar(...)` from `jobs.py::HuduDataTarget`. Tracked but not yet fixed.
+The SSoT framework's `DataTarget` already provides a `dryrun` Job parameter. Our Job class originally also declared `dry_run`, so the UI showed **both** checkboxes side-by-side — confusing and only the framework's actually gated writeback. Removed our duplicate; the framework's `dryrun` is the canonical control.
 
 ### 4. Hudu HQ has email-OTP gating that can 500
 

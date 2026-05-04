@@ -10,10 +10,6 @@ from nautobot_ssot_hudu.diffsync.adapters.nautobot import NautobotAdapter
 class HuduDataTarget(DataTarget):
     """Push Nautobot data into Hudu."""
 
-    dry_run = BooleanVar(
-        default=True,
-        description="Calculate the diff but do not write anything to Hudu.",
-    )
     hard_delete = BooleanVar(
         default=False,
         description="Permanently delete Hudu records that no longer exist in Nautobot. "
