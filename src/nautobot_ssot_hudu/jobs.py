@@ -31,10 +31,16 @@ class HuduDataTarget(DataTarget):
 
     def load_target_adapter(self) -> None:
         """Load current Hudu state into the target DiffSync adapter."""
+        from django.conf import settings
+
+        plugin_cfg = settings.PLUGINS_CONFIG.get("nautobot_ssot_hudu", {})
+        device_layout_id = plugin_cfg.get("asset_layouts", {}).get("device")
+
         self.target_adapter = HuduAdapter(
             job=self,
             sync=self.sync,
             hard_delete=self.hard_delete,
+            device_layout_id=device_layout_id,
         )
         self.target_adapter.load()
 

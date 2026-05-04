@@ -21,6 +21,8 @@ _FAKE_MODULES = [
     "nautobot",
     "nautobot.apps",
     "nautobot.apps.jobs",
+    "nautobot.dcim",
+    "nautobot.dcim.models",
     "nautobot.tenancy",
     "nautobot.tenancy.models",
     "nautobot.extras",
