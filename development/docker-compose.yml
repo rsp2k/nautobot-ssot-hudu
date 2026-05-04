@@ -28,6 +28,7 @@ x-nautobot-common: &nautobot-common
     NAUTOBOT_CREATE_SUPERUSER: "true"
     HUDU_INSTANCE_URL: ${HUDU_INSTANCE_URL:-}
     HUDU_API_KEY: ${HUDU_API_KEY:-}
+    HUDU_DEVICE_LAYOUT_ID: ${HUDU_DEVICE_LAYOUT_ID:-}
     PYTHONUNBUFFERED: "1"
   volumes:
     # Custom config (PLUGINS list, PLUGINS_CONFIG, debug toggles).

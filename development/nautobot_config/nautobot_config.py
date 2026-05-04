@@ -27,7 +27,11 @@ PLUGINS_CONFIG = {
         "instance_url": os.environ.get("HUDU_INSTANCE_URL", ""),
         "secret_group_name": "Hudu Credentials",
         "asset_layouts": {
-            # Filled in once we know the Hudu instance's layout IDs.
+            # Hudu asset_layout_id under which Nautobot Devices are synced.
+            # Unset → device sync is skipped (Companies still sync).
+            "device": int(os.environ["HUDU_DEVICE_LAYOUT_ID"])
+            if os.environ.get("HUDU_DEVICE_LAYOUT_ID")
+            else None,
         },
     },
 }
