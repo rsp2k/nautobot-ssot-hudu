@@ -14,6 +14,11 @@ class HuduDataTarget(DataTarget):
         default=True,
         description="Calculate the diff but do not write anything to Hudu.",
     )
+    hard_delete = BooleanVar(
+        default=False,
+        description="Permanently delete Hudu records that no longer exist in Nautobot. "
+        "If False (default), archive them instead — recoverable via the Hudu UI.",
+    )
 
     class Meta:
         """Job metadata."""
@@ -30,7 +35,11 @@ class HuduDataTarget(DataTarget):
 
     def load_target_adapter(self) -> None:
         """Load current Hudu state into the target DiffSync adapter."""
-        self.target_adapter = HuduAdapter(job=self, sync=self.sync)
+        self.target_adapter = HuduAdapter(
+            job=self,
+            sync=self.sync,
+            hard_delete=self.hard_delete,
+        )
         self.target_adapter.load()
 
 
