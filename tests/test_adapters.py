@@ -146,6 +146,65 @@ class TestHuduAdapter:
         assert company.description is None
 
 
+class TestHuduAdapterDeviceLoading:
+    """HuduAdapter._load_devices opt-in via device_layout_id."""
+
+    def test_skips_device_load_when_layout_id_is_none(self) -> None:
+        from nautobot_ssot_hudu.diffsync.adapters.hudu import HuduAdapter
+
+        mock_client = MagicMock()
+        mock_client.companies.list.return_value = []
+
+        adapter = HuduAdapter(client=mock_client, device_layout_id=None)
+        adapter.load()
+
+        # Companies were loaded (empty, but the call happened)...
+        mock_client.companies.list.assert_called_once()
+        # ...but assets.list must NOT have been called: no device_layout_id
+        # means we have no idea which Hudu layout represents devices, so we
+        # skip rather than dragging every asset of every layout into the diff.
+        mock_client.assets.list.assert_not_called()
+
+    def test_loads_devices_filtered_by_layout_id_when_set(self) -> None:
+        from nautobot_ssot_hudu.diffsync.adapters.hudu import HuduAdapter
+
+        mock_client = MagicMock()
+        mock_client.companies.list.return_value = [
+            _make_obj(id=1, name="Acme", notes=""),
+        ]
+        mock_client.assets.list.return_value = [
+            _make_obj(id=100, name="edge-01", company_id=1, notes=""),
+        ]
+
+        adapter = HuduAdapter(client=mock_client, device_layout_id=7)
+        adapter.load()
+
+        mock_client.assets.list.assert_called_once_with(asset_layout_id=7)
+        device = adapter.get_all("device")[0]
+        assert device.company_name == "Acme"
+        assert device.name == "edge-01"
+        assert device.pk == 100
+
+    def test_skips_assets_whose_company_isnt_loaded(self) -> None:
+        from nautobot_ssot_hudu.diffsync.adapters.hudu import HuduAdapter
+
+        mock_client = MagicMock()
+        mock_client.companies.list.return_value = [
+            _make_obj(id=1, name="Acme", notes=""),
+        ]
+        # Asset references company_id=999 which we never loaded — could be an
+        # archived/deleted Hudu Company. Skip silently rather than crash on
+        # the missing parent identifier.
+        mock_client.assets.list.return_value = [
+            _make_obj(id=100, name="orphan", company_id=999, notes=""),
+        ]
+
+        adapter = HuduAdapter(client=mock_client, device_layout_id=7)
+        adapter.load()
+
+        assert adapter.get_all("device") == []
+
+
 class TestDiffStability:
     """End-to-end check: empty-on-both-sides matches as no-change."""
 

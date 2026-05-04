@@ -9,7 +9,12 @@ real model definitions but stub out Nautobot framework imports (see
 import pytest
 from pydantic import ValidationError
 
-from nautobot_ssot_hudu.diffsync.models.company import Company, HuduCompany
+from nautobot_ssot_hudu.diffsync.models.company import (
+    Company,
+    Device,
+    HuduCompany,
+    HuduDevice,
+)
 
 
 class TestCompany:
@@ -79,3 +84,55 @@ class TestHuduCompany:
         assert hasattr(HuduCompany, "create")
         assert hasattr(HuduCompany, "update")
         assert hasattr(HuduCompany, "delete")
+
+
+class TestDevice:
+    """Device model — Hudu Asset names are company-scoped, not globally unique."""
+
+    def test_modelname(self) -> None:
+        assert Device._modelname == "device"
+
+    def test_identifiers_is_composite(self) -> None:
+        # CRITICAL: Hudu Asset names are unique within company, not globally.
+        # Identity must be the (company_name, name) tuple, otherwise two
+        # different Hudu instances of "edge-router-01" in different companies
+        # would clobber each other in the diff.
+        assert Device._identifiers == ("company_name", "name")
+
+    def test_attributes(self) -> None:
+        assert Device._attributes == ("description",)
+
+    def test_construction_requires_company_and_name(self) -> None:
+        with pytest.raises(ValidationError):
+            Device(name="edge-router-01")  # missing company_name
+        with pytest.raises(ValidationError):
+            Device(company_name="Acme")  # missing name
+
+    def test_construction_with_full_fields(self) -> None:
+        d = Device(company_name="Acme", name="edge-router-01", description="Edge router.")
+        assert d.company_name == "Acme"
+        assert d.name == "edge-router-01"
+        assert d.description == "Edge router."
+
+
+class TestHuduDevice:
+    """Hudu-side Device variant: same schema + pk + CRUD."""
+
+    def test_inherits_from_device(self) -> None:
+        assert issubclass(HuduDevice, Device)
+
+    def test_keeps_device_identifiers(self) -> None:
+        assert HuduDevice._identifiers == Device._identifiers
+
+    def test_keeps_device_attributes(self) -> None:
+        assert HuduDevice._attributes == Device._attributes
+
+    def test_pk_is_optional_int_not_in_attributes(self) -> None:
+        instance = HuduDevice(company_name="Acme", name="edge-01")
+        assert instance.pk is None
+        assert "pk" not in HuduDevice._attributes
+
+    def test_crud_methods_exist(self) -> None:
+        assert hasattr(HuduDevice, "create")
+        assert hasattr(HuduDevice, "update")
+        assert hasattr(HuduDevice, "delete")
