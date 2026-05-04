@@ -6,6 +6,8 @@ A [Nautobot](https://nautobot.com) [SSoT](https://github.com/nautobot/nautobot-a
 
 **Status:** Alpha. Under active development.
 
+**Compatibility:** Nautobot 3.0+, Python 3.10+, `nautobot-ssot` 4.2+.
+
 ## Architecture
 
 Built on the [DiffSync](https://github.com/networktocode/diffsync) library bundled with `nautobot-ssot`. The [hudu-magic](https://pypi.org/project/hudu-magic/) client library handles all Hudu API I/O.
@@ -33,12 +35,18 @@ Configuration lives in `nautobot_config.py` under `PLUGINS_CONFIG`. Hudu API cre
 PLUGINS_CONFIG = {
     "nautobot_ssot_hudu": {
         "instance_url": "https://acme.huducloud.com",
-        "secret_group_slug": "hudu-credentials",  # Nautobot Secrets Group with the API key
+        "secret_group_name": "Hudu Credentials",  # Name of a Nautobot SecretsGroup
         "asset_layouts": {
             "device": 7,  # Hudu asset_layout_id
         },
     }
 }
+```
+
+The named SecretsGroup must contain a Secret with access-type **HTTP** and
+secret-type **Token** holding the Hudu API key.
+
+```python
 ```
 
 Run-time options (dry-run, scope filters) are exposed as Job parameters.

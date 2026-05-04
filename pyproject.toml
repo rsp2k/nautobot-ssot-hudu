@@ -21,6 +21,7 @@ classifiers = [
     "Framework :: Django",
 ]
 dependencies = [
+    "nautobot>=3.0,<4",
     "nautobot-ssot>=4.2,<5",
     "hudu-magic>=0.4,<0.5",
 ]

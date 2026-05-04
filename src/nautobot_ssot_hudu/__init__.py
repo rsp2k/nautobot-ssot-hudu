@@ -23,7 +23,7 @@ class NautobotSSoTHuduConfig(NautobotAppConfig):
     required_settings: list[str] = []
     default_settings: dict = {
         "instance_url": "",
-        "secret_group_slug": "",
+        "secret_group_name": "",
         "asset_layouts": {},
     }
     caching_config: dict = {}
