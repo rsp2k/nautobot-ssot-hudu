@@ -51,6 +51,46 @@ make restart        # restarts nautobot-web; worker picks up new imports too
 
 The plugin `src/` is bind-mounted into the container, so file edits are immediately visible — but Python's import cache means a process restart is required.
 
+## Gotchas surfaced during 2026-05-04 first bringup
+
+These are the not-obvious failures we hit. Document so future-you doesn't.
+
+### 1. `COMPOSE_PROJECT_NAME`, not `COMPOSE_PROJECT`
+
+The `.env` *must* set `COMPOSE_PROJECT_NAME=ssot-hudu-dev` (the canonical docker-compose env var), not `COMPOSE_PROJECT`. The latter is only a YAML substitution variable — it renames containers but does **not** tell docker-compose what the project itself is called.
+
+Without `COMPOSE_PROJECT_NAME`, docker-compose falls back to the directory name as the project. Our directory is `development/`, which collides with at least one other project on this host (e.g. `nautobot-app-phones/development/`). Symptom: postgres data volume `development_postgres-data` gets shared across both, and our nautobot's `NAUTOBOT_DB_PASSWORD` doesn't match the password baked into the volume. You see "FATAL: password authentication failed for user nautobot" on every web boot.
+
+`make ps` and `docker compose ls` will both lie about which project owns what — `docker compose ls -a` is the truth and shows the collision clearly.
+
+### 2. Volume permissions on first boot
+
+Nautobot runs as uid 999 inside the container, but docker-named-volumes start as root-owned (uid 0). Result: `PermissionError: [Errno 13] Permission denied: '/opt/nautobot/media/devicetype-images'` during `_preprocess_settings` on first boot — Nautobot can't `mkdir` inside its own `MEDIA_ROOT`.
+
+Fix once at install time:
+
+```bash
+docker compose down
+docker run --rm \
+  -v ssot-hudu-dev_nautobot-media:/m \
+  -v ssot-hudu-dev_nautobot-static:/s \
+  -v ssot-hudu-dev_nautobot-git-repos:/g \
+  alpine sh -c 'chown -R 999:999 /m /s /g'
+docker compose up -d
+```
+
+Alternative: bake the chown into an init container. Not done here for simplicity.
+
+### 3. `dryrun` (framework) vs `dry_run` (ours)
+
+The SSoT framework's `DataTarget` already provides a `dryrun` Job parameter. Our Job class also declares `dry_run`, so the UI shows **both** checkboxes side-by-side. They're checked by default; only the framework's `dryrun` actually gates the writeback. Our `dry_run` is decorative.
+
+To clean up: remove `dry_run = BooleanVar(...)` from `jobs.py::HuduDataTarget`. Tracked but not yet fixed.
+
+### 4. Hudu HQ has email-OTP gating that can 500
+
+When signing into Hudu HQ to get a license key, the OTP step occasionally returns a 500. Refreshing to `https://hq.hudu.com/` typically lands on the dashboard anyway — the cookie session was set despite the error page. Don't trust the error; refresh first.
+
 ## Inspect Sync history
 
 ```bash
