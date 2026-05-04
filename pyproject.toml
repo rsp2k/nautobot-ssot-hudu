@@ -1,0 +1,77 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nautobot-ssot-hudu"
+version = "2026.5.4"
+description = "Nautobot SSoT integration for Hudu (one-way: Nautobot -> Hudu)."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Ryan Malloy", email = "ryan@supported.systems" }]
+keywords = ["nautobot", "nautobot-app", "nautobot-plugin", "ssot", "hudu", "diffsync"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Framework :: Django",
+]
+dependencies = [
+    "nautobot-ssot>=4.2,<5",
+    "hudu-magic>=0.4,<0.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/rsp/nautobot-plugin-ssot-hudu"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nautobot_ssot_hudu"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "CLAUDE.md",
+    ".env",
+    ".env.local",
+    ".mcp.json",
+    "/local/",
+    ".pytest_cache/",
+    ".ruff_cache/",
+    "dist/",
+    "build/",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "D",    # pydocstyle
+]
+ignore = [
+    "D203",  # one-blank-line-before-class (conflicts with D211)
+    "D213",  # multi-line-summary-second-line (conflicts with D212)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D"]
+"src/nautobot_ssot_hudu/migrations/*" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
