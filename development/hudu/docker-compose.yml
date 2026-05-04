@@ -75,6 +75,12 @@ services:
       - app_data:/var/www/hudu2/public/uploads/
       - app_data:/var/www/hudu2/uploads/
       - app_data:/var/lib/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/ -o /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
     networks:
       - internal
       - caddy
@@ -99,6 +105,12 @@ services:
     volumes:
       - app_data:/var/www/hudu2/public/uploads/
       - app_data:/var/www/hudu2/uploads/
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f sidekiq > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     networks:
       - internal
 
