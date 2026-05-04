@@ -49,7 +49,7 @@ x-nautobot-common: &nautobot-common
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: ${COMPOSE_PROJECT}-postgres
+    container_name: ${COMPOSE_PROJECT_NAME}-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${NAUTOBOT_DB_NAME}
@@ -67,7 +67,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: ${COMPOSE_PROJECT}-redis
+    container_name: ${COMPOSE_PROJECT_NAME}-redis
     restart: unless-stopped
     command: ["redis-server", "--requirepass", "${NAUTOBOT_REDIS_PASSWORD}"]
     volumes:
@@ -82,7 +82,7 @@ services:
 
   nautobot-web:
     <<: *nautobot-common
-    container_name: ${COMPOSE_PROJECT}-web
+    container_name: ${COMPOSE_PROJECT_NAME}-web
     networks:
       - internal
       - caddy
@@ -93,7 +93,7 @@ services:
 
   nautobot-worker:
     <<: *nautobot-common
-    container_name: ${COMPOSE_PROJECT}-worker
+    container_name: ${COMPOSE_PROJECT_NAME}-worker
     entrypoint: ["nautobot-server", "celery", "worker", "-l", "INFO"]
     networks:
       - internal
