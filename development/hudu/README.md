@@ -32,10 +32,12 @@ Once the app is up, visit `https://${DOMAIN}/` — you should see Hudu's first-r
 
 ## License key
 
-1. Go to https://hq.hudu.com/ and sign in (Bing / Bingham account)
+1. Go to https://hq.hudu.com/ and sign in (Bing Man / Bingham account — see `.hudu-account.local` for credentials)
 2. Navigate to the trial-start page → "Get Started!" → generates a license key
 3. Paste the key into Hudu's first-run prompt
 4. Create the admin user when asked
+
+> **Trial expiry:** the Hudu trial is 14 days from license generation (e.g. created 2026-05-04 → expires 2026-05-19). Convert to a paid license or stand up a fresh trial after expiry.
 
 ## Verify
 
@@ -61,11 +63,13 @@ docker compose down -v          # destroy postgres/redis/uploads (PERMANENT)
 | `worker` mounts `.:/app` for dev hot-reload | dropped | Production-style only |
 | All services use docker-compose default names | `${COMPOSE_PROJECT}-` prefix | Avoid collisions with sibling stacks |
 
-## Known unknowns (will surface during first boot)
+## Validated during first bringup (2026-05-04)
 
-- **Puma port assumption** — labels point to `3000`. If wrong, `docker compose exec app netstat -tnlp` shows what Puma actually binds; update `caddy.reverse_proxy` accordingly.
-- **Static asset serving** — Rails in production normally has nginx in front to serve `/assets/`. Without it, Puma serves them, which is fine for testing but slower. If asset loading is sluggish under real use, we'd add `RAILS_SERVE_STATIC_FILES=true` and accept the perf cost, or re-introduce a thin nginx as a sidecar.
-- **ActionCable WebSocket upgrade** — Caddy 2 handles `Upgrade: websocket` automatically. Should work without explicit labels, but if real-time features (notifications, presence) misbehave, that's the place to check.
+All three "known unknowns" from the original design ended up working as guessed. Captured here for posterity:
+
+- **Puma binds port 3000** — confirmed via `docker compose ps` showing `3000/tcp` for both `app` and `worker`. Caddy labels were correct.
+- **Static asset serving works from Puma** — no `RAILS_SERVE_STATIC_FILES=true` env var needed; Hudu's Rails app handles `/assets/` requests itself in production mode. Performance has been adequate for testing-scale traffic; for real use a sidecar nginx may help.
+- **ActionCable through Caddy** — basic browsing/notifications work. Real-time-heavy features (presence, live updates) not exercised under load. If they misbehave under real use, add explicit websocket-upgrade handling to the Caddy labels.
 
 ## Backup what matters
 

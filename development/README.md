@@ -38,8 +38,8 @@ Creates five fictional Tenants (Acme, Globex, Initech, Soylent, Cyberdyne) and a
 In the Nautobot UI: **Apps → Single Source of Truth → Dashboard → Hudu (Data Target) → Run**
 
 Job parameters:
-- `dry_run` (default True) — show the diff without writing to Hudu
-- `hard_delete` (default False) — archive vs. permanently delete orphaned Hudu Companies
+- `dryrun` (default True) — show the diff without writing to Hudu. *Provided by the SSoT framework's `DataTarget` base class.*
+- `hard_delete` (default False) — archive (recoverable in Hudu UI) vs. permanently delete orphaned Hudu records.
 
 To target a real Hudu instance, set `HUDU_INSTANCE_URL` and `HUDU_API_KEY` in `.env` and re-run `make up && make seed`.
 
