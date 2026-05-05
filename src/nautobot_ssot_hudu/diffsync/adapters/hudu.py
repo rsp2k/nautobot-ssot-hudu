@@ -6,6 +6,7 @@ from nautobot_ssot_hudu.diffsync.models.company import HuduCompany
 from nautobot_ssot_hudu.diffsync.models.device import HuduDevice
 from nautobot_ssot_hudu.diffsync.models.ipaddress import HuduIPAddress
 from nautobot_ssot_hudu.diffsync.models.network import HuduNetwork
+from nautobot_ssot_hudu.diffsync.models.vlan import HuduVLAN
 from nautobot_ssot_hudu.utils.hudu_client import build_client
 
 
@@ -16,8 +17,9 @@ class HuduAdapter(Adapter):
     device = HuduDevice
     network = HuduNetwork
     ipaddress = HuduIPAddress
+    vlan = HuduVLAN
 
-    top_level = ("company", "device", "network", "ipaddress")
+    top_level = ("company", "device", "network", "ipaddress", "vlan")
 
     def __init__(
         self,
@@ -53,6 +55,7 @@ class HuduAdapter(Adapter):
             self._load_devices()
         self._load_networks()
         self._load_ipaddresses()
+        self._load_vlans()
 
     def _all_device_layout_ids(self) -> set[int]:
         """The union of layouts to load assets from: default + per-role values."""
@@ -135,6 +138,28 @@ class HuduAdapter(Adapter):
                     name=net.get("name") or address,
                     description=(net.get("description") or None),
                     pk=net.get("id"),
+                )
+            )
+
+    def _load_vlans(self) -> None:
+        company_name_by_pk = {
+            c.pk: c.name for c in self.get_all("company") if c.pk is not None
+        }
+        # Same pagination quirk as networks/ip_addresses: bypass via paginate=False.
+        for v in self.client.get("vlans", paginate=False) or []:
+            company_name = company_name_by_pk.get(v.get("company_id"))
+            if company_name is None:
+                continue
+            vid = v.get("vlan_id")
+            if vid is None:
+                continue  # Hudu allows null vlan_id; skip — no Nautobot equivalent.
+            self.add(
+                self.vlan(
+                    company_name=company_name,
+                    vid=int(vid),
+                    name=(v.get("name") or None),
+                    description=(v.get("description") or None),
+                    pk=v.get("id"),
                 )
             )
 

@@ -2,13 +2,14 @@
 
 from diffsync import Adapter
 from nautobot.dcim.models import Device
-from nautobot.ipam.models import IPAddress, Prefix
+from nautobot.ipam.models import VLAN, IPAddress, Prefix
 from nautobot.tenancy.models import Tenant
 
 from nautobot_ssot_hudu.diffsync.models.company import Company
 from nautobot_ssot_hudu.diffsync.models.device import Device as DeviceModel
 from nautobot_ssot_hudu.diffsync.models.ipaddress import IPAddress as IPAddressModel
 from nautobot_ssot_hudu.diffsync.models.network import Network as NetworkModel
+from nautobot_ssot_hudu.diffsync.models.vlan import VLAN as VLANModel
 
 
 def _resolve_attr_path(obj, path: str):
@@ -33,8 +34,9 @@ class NautobotAdapter(Adapter):
     device = DeviceModel
     network = NetworkModel
     ipaddress = IPAddressModel
+    vlan = VLANModel
 
-    top_level = ("company", "device", "network", "ipaddress")
+    top_level = ("company", "device", "network", "ipaddress", "vlan")
 
     def __init__(
         self,
@@ -70,6 +72,7 @@ class NautobotAdapter(Adapter):
         self._load_devices()
         self._load_prefixes()
         self._load_ipaddresses()
+        self._load_vlans()
 
     def _load_companies(self) -> None:
         for tenant in Tenant.objects.all():
@@ -103,6 +106,17 @@ class NautobotAdapter(Adapter):
                     name=device.name,
                     asset_layout_id=layout_id,
                     field_values=field_values,
+                )
+            )
+
+    def _load_vlans(self) -> None:
+        for vlan in VLAN.objects.filter(tenant__isnull=False).select_related("tenant"):
+            self.add(
+                self.vlan(
+                    company_name=vlan.tenant.name,
+                    vid=vlan.vid,
+                    name=vlan.name or None,
+                    description=vlan.description or None,
                 )
             )
 

@@ -26,6 +26,7 @@ Nautobot ORM ──> Nautobot DiffSync adapter ─┐
 | `dcim.Device` | Asset (per-role layouts + configurable custom field map) | ✅ name + custom-field map + role-based layout selection |
 | `ipam.Prefix` | Network | ✅ address (CIDR), name, description |
 | `ipam.IPAddress` | IPAddress | ✅ address (host), dns_name, description |
+| `ipam.VLAN` | VLAN | ✅ vid (1-4094), name, description |
 
 **Identity model:**
 - Companies match by `name` (globally unique on both sides)

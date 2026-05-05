@@ -13,6 +13,7 @@ from nautobot_ssot_hudu.diffsync.models.company import Company, HuduCompany
 from nautobot_ssot_hudu.diffsync.models.device import Device, HuduDevice
 from nautobot_ssot_hudu.diffsync.models.ipaddress import HuduIPAddress, IPAddress
 from nautobot_ssot_hudu.diffsync.models.network import HuduNetwork, Network
+from nautobot_ssot_hudu.diffsync.models.vlan import VLAN, HuduVLAN
 
 
 class TestCompany:
@@ -295,6 +296,46 @@ class TestHuduIPAddress:
         adapter = MagicMock()
         adapter.get_all.return_value = []
         assert HuduIPAddress._resolve_network_id(adapter, "Acme", "not-an-ip") is None
+
+
+class TestVLAN:
+    """VLAN model — Hudu's vlan_id is the 802.1Q tag (1-4094)."""
+
+    def test_modelname(self) -> None:
+        assert VLAN._modelname == "vlan"
+
+    def test_identifiers_is_company_and_vid(self) -> None:
+        # Two companies can each own VLAN 100; identity must include company.
+        assert VLAN._identifiers == ("company_name", "vid")
+
+    def test_attributes(self) -> None:
+        assert VLAN._attributes == ("name", "description")
+
+    def test_construction_requires_company_and_vid(self) -> None:
+        with pytest.raises(ValidationError):
+            VLAN(vid=100)  # missing company_name
+        with pytest.raises(ValidationError):
+            VLAN(company_name="Acme")  # missing vid
+
+    def test_vid_is_int(self) -> None:
+        # Pydantic should coerce strings to int (Nautobot stores as integer).
+        v = VLAN(company_name="Acme", vid=100)
+        assert v.vid == 100
+        assert isinstance(v.vid, int)
+
+
+class TestHuduVLAN:
+    def test_inherits_from_vlan(self) -> None:
+        assert issubclass(HuduVLAN, VLAN)
+
+    def test_keeps_identifiers_and_attributes(self) -> None:
+        assert HuduVLAN._identifiers == VLAN._identifiers
+        assert HuduVLAN._attributes == VLAN._attributes
+
+    def test_pk_is_optional_and_not_in_attributes(self) -> None:
+        instance = HuduVLAN(company_name="Acme", vid=100)
+        assert instance.pk is None
+        assert "pk" not in HuduVLAN._attributes
 
 
 class TestCustomFieldsHelpers:
