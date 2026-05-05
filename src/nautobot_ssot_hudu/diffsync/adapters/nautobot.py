@@ -1,7 +1,7 @@
 """Nautobot-side DiffSync adapter (source of truth)."""
 
 from diffsync import Adapter
-from nautobot.dcim.models import Device
+from nautobot.dcim.models import Device, Rack
 from nautobot.ipam.models import VLAN, IPAddress, Prefix
 from nautobot.tenancy.models import Tenant
 
@@ -9,6 +9,7 @@ from nautobot_ssot_hudu.diffsync.models.company import Company
 from nautobot_ssot_hudu.diffsync.models.device import Device as DeviceModel
 from nautobot_ssot_hudu.diffsync.models.ipaddress import IPAddress as IPAddressModel
 from nautobot_ssot_hudu.diffsync.models.network import Network as NetworkModel
+from nautobot_ssot_hudu.diffsync.models.rack import Rack as RackModel
 from nautobot_ssot_hudu.diffsync.models.vlan import VLAN as VLANModel
 
 
@@ -35,8 +36,9 @@ class NautobotAdapter(Adapter):
     network = NetworkModel
     ipaddress = IPAddressModel
     vlan = VLANModel
+    rack = RackModel
 
-    top_level = ("company", "device", "network", "ipaddress", "vlan")
+    top_level = ("company", "device", "network", "ipaddress", "vlan", "rack")
 
     def __init__(
         self,
@@ -73,6 +75,7 @@ class NautobotAdapter(Adapter):
         self._load_prefixes()
         self._load_ipaddresses()
         self._load_vlans()
+        self._load_racks()
 
     def _load_companies(self) -> None:
         for tenant in Tenant.objects.all():
@@ -106,6 +109,23 @@ class NautobotAdapter(Adapter):
                     name=device.name,
                     asset_layout_id=layout_id,
                     field_values=field_values,
+                )
+            )
+
+    def _load_racks(self) -> None:
+        for rack in Rack.objects.filter(tenant__isnull=False).select_related("tenant"):
+            self.add(
+                self.rack(
+                    company_name=rack.tenant.name,
+                    name=rack.name,
+                    height=rack.u_height or 42,
+                    width=rack.width or 19,
+                    serial=rack.serial or None,
+                    asset_tag=rack.asset_tag or None,
+                    # Nautobot uses `comments` for free-form text; map to
+                    # Hudu's `description` for the same operator semantics.
+                    description=rack.comments or None,
+                    descending_units=rack.desc_units,
                 )
             )
 

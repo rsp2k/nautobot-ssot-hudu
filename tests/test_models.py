@@ -13,6 +13,7 @@ from nautobot_ssot_hudu.diffsync.models.company import Company, HuduCompany
 from nautobot_ssot_hudu.diffsync.models.device import Device, HuduDevice
 from nautobot_ssot_hudu.diffsync.models.ipaddress import HuduIPAddress, IPAddress
 from nautobot_ssot_hudu.diffsync.models.network import HuduNetwork, Network
+from nautobot_ssot_hudu.diffsync.models.rack import HuduRack, Rack
 from nautobot_ssot_hudu.diffsync.models.vlan import VLAN, HuduVLAN
 
 
@@ -336,6 +337,54 @@ class TestHuduVLAN:
         instance = HuduVLAN(company_name="Acme", vid=100)
         assert instance.pk is None
         assert "pk" not in HuduVLAN._attributes
+
+
+class TestRack:
+    """Rack model — Hudu calls them 'rack_storages' in the API."""
+
+    def test_modelname(self) -> None:
+        assert Rack._modelname == "rack"
+
+    def test_identifiers_is_company_and_name(self) -> None:
+        assert Rack._identifiers == ("company_name", "name")
+
+    def test_attributes_includes_dimensions_and_metadata(self) -> None:
+        assert Rack._attributes == (
+            "height",
+            "width",
+            "serial",
+            "asset_tag",
+            "description",
+            "descending_units",
+        )
+
+    def test_construction_requires_company_and_name(self) -> None:
+        with pytest.raises(ValidationError):
+            Rack(name="rack-01")  # missing company_name
+        with pytest.raises(ValidationError):
+            Rack(company_name="Acme")  # missing name
+
+    def test_defaults_match_typical_42u_19in_rack(self) -> None:
+        # Sensible defaults so partial Nautobot data doesn't surprise the
+        # operator with weird values in Hudu.
+        r = Rack(company_name="Acme", name="rack-01")
+        assert r.height == 42
+        assert r.width == 19
+        assert r.descending_units is False
+
+
+class TestHuduRack:
+    def test_inherits_from_rack(self) -> None:
+        assert issubclass(HuduRack, Rack)
+
+    def test_keeps_identifiers_and_attributes(self) -> None:
+        assert HuduRack._identifiers == Rack._identifiers
+        assert HuduRack._attributes == Rack._attributes
+
+    def test_pk_is_optional_and_not_in_attributes(self) -> None:
+        instance = HuduRack(company_name="Acme", name="rack-01")
+        assert instance.pk is None
+        assert "pk" not in HuduRack._attributes
 
 
 class TestCustomFieldsHelpers:

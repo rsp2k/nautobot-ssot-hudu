@@ -6,6 +6,7 @@ from nautobot_ssot_hudu.diffsync.models.company import HuduCompany
 from nautobot_ssot_hudu.diffsync.models.device import HuduDevice
 from nautobot_ssot_hudu.diffsync.models.ipaddress import HuduIPAddress
 from nautobot_ssot_hudu.diffsync.models.network import HuduNetwork
+from nautobot_ssot_hudu.diffsync.models.rack import HuduRack
 from nautobot_ssot_hudu.diffsync.models.vlan import HuduVLAN
 from nautobot_ssot_hudu.utils.hudu_client import build_client
 
@@ -18,8 +19,9 @@ class HuduAdapter(Adapter):
     network = HuduNetwork
     ipaddress = HuduIPAddress
     vlan = HuduVLAN
+    rack = HuduRack
 
-    top_level = ("company", "device", "network", "ipaddress", "vlan")
+    top_level = ("company", "device", "network", "ipaddress", "vlan", "rack")
 
     def __init__(
         self,
@@ -56,6 +58,7 @@ class HuduAdapter(Adapter):
         self._load_networks()
         self._load_ipaddresses()
         self._load_vlans()
+        self._load_racks()
 
     def _all_device_layout_ids(self) -> set[int]:
         """The union of layouts to load assets from: default + per-role values."""
@@ -138,6 +141,30 @@ class HuduAdapter(Adapter):
                     name=net.get("name") or address,
                     description=(net.get("description") or None),
                     pk=net.get("id"),
+                )
+            )
+
+    def _load_racks(self) -> None:
+        company_name_by_pk = {
+            c.pk: c.name for c in self.get_all("company") if c.pk is not None
+        }
+        # Unlike networks/ip_addresses/vlans, /api/v1/rack_storages accepts
+        # the `page` query param happily — no paginate=False bypass needed.
+        for r in self.client.rack_storages.list() or []:
+            company_name = company_name_by_pk.get(getattr(r, "company_id", None))
+            if company_name is None:
+                continue
+            self.add(
+                self.rack(
+                    company_name=company_name,
+                    name=r.name,
+                    height=getattr(r, "height", None) or 42,
+                    width=getattr(r, "width", None) or 19,
+                    serial=getattr(r, "serial_number", None) or None,
+                    asset_tag=getattr(r, "asset_tag", None) or None,
+                    description=getattr(r, "description", None) or None,
+                    descending_units=getattr(r, "descending_units", False),
+                    pk=r.id,
                 )
             )
 
