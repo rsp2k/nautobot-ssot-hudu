@@ -43,7 +43,17 @@ PLUGINS_CONFIG = {
         "instance_url": "https://acme.huducloud.com",
         "secret_group_name": "Hudu Credentials",
         "asset_layouts": {
-            "device": 7,  # Hudu asset_layout_id
+            # Default Hudu asset_layout_id for Devices whose role isn't
+            # explicitly mapped below. Unset/None → those devices skip.
+            "device": 7,
+            # Optional per-Nautobot-Role overrides. Keys are role names;
+            # values are Hudu asset_layout_ids. Useful for MSPs documenting
+            # heterogeneous fleets across multiple Hudu layouts.
+            "device_by_role": {
+                "router": 8,
+                "switch": 9,
+                "firewall": 10,
+            },
         },
         # Hudu field label -> Nautobot Device attribute path (dotted)
         "device_field_map": {
@@ -70,7 +80,17 @@ PLUGINS_CONFIG = {
         "instance_url": "https://acme.huducloud.com",
         "secret_group_name": "Hudu Credentials",  # Name of a Nautobot SecretsGroup
         "asset_layouts": {
-            "device": 7,  # Hudu asset_layout_id
+            # Default Hudu asset_layout_id for Devices whose role isn't
+            # explicitly mapped below. Unset/None → those devices skip.
+            "device": 7,
+            # Optional per-Nautobot-Role overrides. Keys are role names;
+            # values are Hudu asset_layout_ids. Useful for MSPs documenting
+            # heterogeneous fleets across multiple Hudu layouts.
+            "device_by_role": {
+                "router": 8,
+                "switch": 9,
+                "firewall": 10,
+            },
         },
     }
 }
