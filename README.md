@@ -29,6 +29,11 @@ Nautobot ORM ──> Nautobot DiffSync adapter ─┐
 | `ipam.VLAN` | VLAN | ✅ vid (1-4094), name, description |
 | `dcim.Rack` | RackStorage | ✅ name, height (U), width (in), serial, asset_tag, description, desc_units |
 | `dcim.Device` rack/position/face | RackStorageItem | ✅ asset placement: rack_name, start_unit, end_unit, side |
+| `dcim.Location` | *(no API equivalent)* | ⚠️ Hudu does not expose Locations as a CRUD entity. Per-device location is captured via `device_field_map["Location"] = "location.name"`. |
+
+**Cross-entity linkages (set automatically when both sides are synced):**
+- IPAddress → Asset (Hudu IP page shows the device it's assigned to, via Nautobot `IPAddress.interface_assignments → device`)
+- Network → VLAN (Hudu Network page shows its VLAN, via Nautobot `Prefix.vlan`)
 
 **Identity model:**
 - Companies match by `name` (globally unique on both sides)
