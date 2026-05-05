@@ -2,11 +2,12 @@
 
 from diffsync import Adapter
 from nautobot.dcim.models import Device
-from nautobot.ipam.models import Prefix
+from nautobot.ipam.models import IPAddress, Prefix
 from nautobot.tenancy.models import Tenant
 
 from nautobot_ssot_hudu.diffsync.models.company import Company
 from nautobot_ssot_hudu.diffsync.models.device import Device as DeviceModel
+from nautobot_ssot_hudu.diffsync.models.ipaddress import IPAddress as IPAddressModel
 from nautobot_ssot_hudu.diffsync.models.network import Network as NetworkModel
 
 
@@ -31,8 +32,9 @@ class NautobotAdapter(Adapter):
     company = Company
     device = DeviceModel
     network = NetworkModel
+    ipaddress = IPAddressModel
 
-    top_level = ("company", "device", "network")
+    top_level = ("company", "device", "network", "ipaddress")
 
     def __init__(
         self,
@@ -67,6 +69,7 @@ class NautobotAdapter(Adapter):
         self._load_companies()
         self._load_devices()
         self._load_prefixes()
+        self._load_ipaddresses()
 
     def _load_companies(self) -> None:
         for tenant in Tenant.objects.all():
@@ -100,6 +103,18 @@ class NautobotAdapter(Adapter):
                     name=device.name,
                     asset_layout_id=layout_id,
                     field_values=field_values,
+                )
+            )
+
+    def _load_ipaddresses(self) -> None:
+        # Same tenant-scoped filter as devices and prefixes.
+        for ip in IPAddress.objects.filter(tenant__isnull=False).select_related("tenant"):
+            self.add(
+                self.ipaddress(
+                    company_name=ip.tenant.name,
+                    address=str(ip.host),
+                    dns_name=ip.dns_name or None,
+                    description=ip.description or None,
                 )
             )
 

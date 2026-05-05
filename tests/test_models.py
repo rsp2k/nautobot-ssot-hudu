@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from nautobot_ssot_hudu.diffsync.models.company import Company, HuduCompany
 from nautobot_ssot_hudu.diffsync.models.device import Device, HuduDevice
+from nautobot_ssot_hudu.diffsync.models.ipaddress import HuduIPAddress, IPAddress
 from nautobot_ssot_hudu.diffsync.models.network import HuduNetwork, Network
 
 
@@ -220,6 +221,80 @@ class TestHuduNetwork:
         assert hasattr(HuduNetwork, "create")
         assert hasattr(HuduNetwork, "update")
         assert hasattr(HuduNetwork, "delete")
+
+
+class TestIPAddress:
+    """IPAddress model — IPs are scoped per-company via their parent Network."""
+
+    def test_modelname(self) -> None:
+        assert IPAddress._modelname == "ipaddress"
+
+    def test_identifiers_is_company_and_address(self) -> None:
+        assert IPAddress._identifiers == ("company_name", "address")
+
+    def test_attributes(self) -> None:
+        assert IPAddress._attributes == ("dns_name", "description")
+
+    def test_construction_requires_company_and_address(self) -> None:
+        with pytest.raises(ValidationError):
+            IPAddress(address="10.0.0.1")  # missing company_name
+        with pytest.raises(ValidationError):
+            IPAddress(company_name="Acme")  # missing address
+
+    def test_construction_with_full_fields(self) -> None:
+        ip = IPAddress(
+            company_name="Acme",
+            address="10.0.0.5",
+            dns_name="server-01.acme.lan",
+            description="Database primary",
+        )
+        assert ip.company_name == "Acme"
+        assert ip.address == "10.0.0.5"
+        assert ip.dns_name == "server-01.acme.lan"
+        assert ip.description == "Database primary"
+
+
+class TestHuduIPAddress:
+    """Hudu-side IPAddress: same schema + pk + CRUD."""
+
+    def test_inherits_from_ipaddress(self) -> None:
+        assert issubclass(HuduIPAddress, IPAddress)
+
+    def test_keeps_identifiers_and_attributes(self) -> None:
+        assert HuduIPAddress._identifiers == IPAddress._identifiers
+        assert HuduIPAddress._attributes == IPAddress._attributes
+
+    def test_pk_is_optional_and_not_in_attributes(self) -> None:
+        instance = HuduIPAddress(company_name="Acme", address="10.0.0.5")
+        assert instance.pk is None
+        assert "pk" not in HuduIPAddress._attributes
+
+    def test_resolve_network_id_finds_containing_network(self) -> None:
+        # The static method that picks the right Hudu Network by IP
+        # membership at create time. Critical for proper FK resolution.
+        from unittest.mock import MagicMock
+
+        adapter = MagicMock()
+        net1 = MagicMock(company_name="Acme", address="10.10.0.0/24", pk=1)
+        net2 = MagicMock(company_name="Acme", address="10.20.0.0/24", pk=2)
+        net_other = MagicMock(company_name="Globex", address="10.10.0.0/24", pk=3)
+        adapter.get_all.return_value = [net1, net2, net_other]
+
+        # IP in 10.10.0.0/24 within Acme → net1.pk
+        assert HuduIPAddress._resolve_network_id(adapter, "Acme", "10.10.0.5") == 1
+        # IP in 10.20.0.0/24 within Acme → net2.pk
+        assert HuduIPAddress._resolve_network_id(adapter, "Acme", "10.20.0.99") == 2
+        # IP in no Acme network
+        assert HuduIPAddress._resolve_network_id(adapter, "Acme", "192.0.2.1") is None
+        # Same /24 in a different company doesn't match for Acme
+        assert HuduIPAddress._resolve_network_id(adapter, "Globex", "10.10.0.5") == 3
+
+    def test_resolve_network_id_handles_invalid_ip(self) -> None:
+        from unittest.mock import MagicMock
+
+        adapter = MagicMock()
+        adapter.get_all.return_value = []
+        assert HuduIPAddress._resolve_network_id(adapter, "Acme", "not-an-ip") is None
 
 
 class TestCustomFieldsHelpers:

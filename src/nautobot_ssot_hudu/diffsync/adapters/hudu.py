@@ -4,6 +4,7 @@ from diffsync import Adapter
 
 from nautobot_ssot_hudu.diffsync.models.company import HuduCompany
 from nautobot_ssot_hudu.diffsync.models.device import HuduDevice
+from nautobot_ssot_hudu.diffsync.models.ipaddress import HuduIPAddress
 from nautobot_ssot_hudu.diffsync.models.network import HuduNetwork
 from nautobot_ssot_hudu.utils.hudu_client import build_client
 
@@ -14,8 +15,9 @@ class HuduAdapter(Adapter):
     company = HuduCompany
     device = HuduDevice
     network = HuduNetwork
+    ipaddress = HuduIPAddress
 
-    top_level = ("company", "device", "network")
+    top_level = ("company", "device", "network", "ipaddress")
 
     def __init__(
         self,
@@ -50,6 +52,7 @@ class HuduAdapter(Adapter):
         if self._all_device_layout_ids():
             self._load_devices()
         self._load_networks()
+        self._load_ipaddresses()
 
     def _all_device_layout_ids(self) -> set[int]:
         """The union of layouts to load assets from: default + per-role values."""
@@ -132,5 +135,25 @@ class HuduAdapter(Adapter):
                     name=net.get("name") or address,
                     description=(net.get("description") or None),
                     pk=net.get("id"),
+                )
+            )
+
+    def _load_ipaddresses(self) -> None:
+        company_name_by_pk = {
+            c.pk: c.name for c in self.get_all("company") if c.pk is not None
+        }
+        # Same pagination quirk as networks: ip_addresses endpoint rejects
+        # the `page` query param hudu-magic auto-adds. Bypass with paginate=False.
+        for ip in self.client.get("ip_addresses", paginate=False) or []:
+            company_name = company_name_by_pk.get(ip.get("company_id"))
+            if company_name is None:
+                continue
+            self.add(
+                self.ipaddress(
+                    company_name=company_name,
+                    address=ip.get("address"),
+                    dns_name=(ip.get("fqdn") or None),
+                    description=(ip.get("description") or None),
+                    pk=ip.get("id"),
                 )
             )
