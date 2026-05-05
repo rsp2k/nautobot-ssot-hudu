@@ -27,11 +27,19 @@ PLUGINS_CONFIG = {
         "instance_url": os.environ.get("HUDU_INSTANCE_URL", ""),
         "secret_group_name": "Hudu Credentials",
         "asset_layouts": {
-            # Hudu asset_layout_id under which Nautobot Devices are synced.
-            # Unset → device sync is skipped (Companies still sync).
+            # Default Hudu asset_layout_id for devices whose role isn't
+            # explicitly mapped below. Unset (None) → those devices are
+            # skipped silently. (Companies + Networks still sync regardless.)
             "device": int(os.environ["HUDU_DEVICE_LAYOUT_ID"])
             if os.environ.get("HUDU_DEVICE_LAYOUT_ID")
             else None,
+            # Per-Nautobot-Role layout overrides. Keys are role names; values
+            # are Hudu asset_layout_ids. Demonstrates: routers/switches share
+            # the default "Network Device" layout, firewalls go to a separate
+            # "Firewall" layout.
+            "device_by_role": {
+                "firewall": 2,  # "Firewall" layout (id=2 in this Hudu instance)
+            },
         },
         # device_field_map: keys are Hudu custom-field labels (must exist on
         # the device asset_layout); values are dotted attribute paths on the

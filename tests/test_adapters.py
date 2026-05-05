@@ -184,6 +184,81 @@ class TestHuduAdapter:
         assert company.description is None
 
 
+class TestNautobotAdapterLayoutResolution:
+    """How NautobotAdapter picks the asset_layout_id for each device."""
+
+    def _adapter(self, **cfg):
+        from nautobot_ssot_hudu.diffsync.adapters.nautobot import NautobotAdapter
+
+        return NautobotAdapter(**cfg)
+
+    def test_per_role_override_wins_over_default(self) -> None:
+        adapter = self._adapter(
+            device_layout_id=1,
+            device_layouts_by_role={"router": 7, "switch": 8},
+        )
+        device = _make_obj(role=_make_obj(name="router"))
+        assert adapter._resolve_layout_id(device) == 7
+
+    def test_falls_back_to_default_when_role_unmapped(self) -> None:
+        adapter = self._adapter(
+            device_layout_id=1,
+            device_layouts_by_role={"router": 7},
+        )
+        device = _make_obj(role=_make_obj(name="firewall"))
+        assert adapter._resolve_layout_id(device) == 1
+
+    def test_returns_none_when_no_default_and_role_unmapped(self) -> None:
+        # Operator set up role-specific layouts but no default; devices with
+        # unmapped roles should be skipped (load returns None → skip).
+        adapter = self._adapter(
+            device_layout_id=None,
+            device_layouts_by_role={"router": 7},
+        )
+        device = _make_obj(role=_make_obj(name="firewall"))
+        assert adapter._resolve_layout_id(device) is None
+
+    def test_role_none_falls_back_to_default(self) -> None:
+        # Defensive: a Device with role=None (unusual but possible) shouldn't
+        # crash; falls back to the default layout if set.
+        adapter = self._adapter(
+            device_layout_id=1,
+            device_layouts_by_role={"router": 7},
+        )
+        device = _make_obj(role=None)
+        assert adapter._resolve_layout_id(device) == 1
+
+
+class TestHuduAdapterLayoutLoading:
+    """HuduAdapter loading from the union of all configured layouts."""
+
+    def test_all_device_layout_ids_unions_default_and_role_map(self) -> None:
+        from nautobot_ssot_hudu.diffsync.adapters.hudu import HuduAdapter
+
+        adapter = HuduAdapter(
+            client=MagicMock(),
+            device_layout_id=1,
+            device_layouts_by_role={"router": 7, "switch": 8},
+        )
+        assert adapter._all_device_layout_ids() == {1, 7, 8}
+
+    def test_all_device_layout_ids_with_no_default(self) -> None:
+        from nautobot_ssot_hudu.diffsync.adapters.hudu import HuduAdapter
+
+        adapter = HuduAdapter(
+            client=MagicMock(),
+            device_layout_id=None,
+            device_layouts_by_role={"router": 7, "switch": 8},
+        )
+        assert adapter._all_device_layout_ids() == {7, 8}
+
+    def test_all_device_layout_ids_empty_when_nothing_configured(self) -> None:
+        from nautobot_ssot_hudu.diffsync.adapters.hudu import HuduAdapter
+
+        adapter = HuduAdapter(client=MagicMock())
+        assert adapter._all_device_layout_ids() == set()
+
+
 class TestHuduAdapterDeviceLoading:
     """HuduAdapter._load_devices opt-in via device_layout_id."""
 

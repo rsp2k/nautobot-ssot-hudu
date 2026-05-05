@@ -40,19 +40,27 @@ class NautobotAdapter(Adapter):
         job=None,
         sync=None,
         device_field_map: dict[str, str] | None = None,
+        device_layout_id: int | None = None,
+        device_layouts_by_role: dict[str, int] | None = None,
         **kwargs,
     ) -> None:
-        """Store Job, Sync, and optional device field mapping config.
+        """Store Job, Sync, and optional device field/layout mapping config.
 
         ``device_field_map`` maps Hudu custom-field labels to Nautobot Device
-        attribute paths (e.g. ``{"Management IP": "primary_ip4.host"}``). Both
-        adapters in a sync session must be initialized with the same map so
-        their loaded ``field_values`` dicts have matching keys for diffing.
+        attribute paths. Both adapters must be initialized with the same map.
+
+        ``device_layout_id`` is the default Hudu asset_layout_id for devices
+        whose role isn't mapped explicitly. ``device_layouts_by_role`` maps
+        Nautobot Role names to layout IDs for finer-grained sorting (e.g.
+        routers in one Hudu layout, switches in another). Devices whose role
+        isn't mapped AND with no default → skipped at load time.
         """
         super().__init__(*args, **kwargs)
         self.job = job
         self.sync = sync
         self.device_field_map = device_field_map or {}
+        self.device_layout_id = device_layout_id
+        self.device_layouts_by_role = device_layouts_by_role or {}
 
     def load(self) -> None:
         """Populate DiffSync models from the Nautobot ORM."""
@@ -74,7 +82,14 @@ class NautobotAdapter(Adapter):
         # Only sync devices that have a tenant — the company_name identifier
         # requires a parent Hudu Company. Tenant-less Nautobot Devices have
         # no natural home in Hudu's company-scoped model and are skipped.
-        for device in Device.objects.filter(tenant__isnull=False).select_related("tenant"):
+        for device in Device.objects.filter(tenant__isnull=False).select_related(
+            "tenant", "role"
+        ):
+            layout_id = self._resolve_layout_id(device)
+            if layout_id is None:
+                # Role isn't in device_layouts_by_role and no default set;
+                # skip silently — operator hasn't asked us to sync this role.
+                continue
             field_values = {
                 label: self._resolve_field_value(device, attr_path)
                 for label, attr_path in self.device_field_map.items()
@@ -83,9 +98,19 @@ class NautobotAdapter(Adapter):
                 self.device(
                     company_name=device.tenant.name,
                     name=device.name,
+                    asset_layout_id=layout_id,
                     field_values=field_values,
                 )
             )
+
+    def _resolve_layout_id(self, device) -> int | None:
+        # Per-role override wins over the default. Role name matching is
+        # case-sensitive — operators name their roles consistently in
+        # Nautobot anyway.
+        role_name = getattr(getattr(device, "role", None), "name", None)
+        if role_name and role_name in self.device_layouts_by_role:
+            return self.device_layouts_by_role[role_name]
+        return self.device_layout_id
 
     def _load_prefixes(self) -> None:
         # Same tenant-scoped filter as devices: a prefix without a tenant

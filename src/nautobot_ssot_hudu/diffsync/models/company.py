@@ -87,14 +87,20 @@ class Device(HuduSSoTModel):
     device_field_map; both adapters produce the same set of keys (drawn
     from the config), with None for unset values. Dict equality is set-of-
     (k,v) so DiffSync compares it order-independently.
+
+    asset_layout_id is included in _attributes so the diff surfaces layout
+    drift — if a Nautobot Device's role is reassigned to a different Hudu
+    layout, the diff shows it. Hudu's API doesn't support migrating an
+    existing asset between layouts; HuduDevice.update logs and skips.
     """
 
     _modelname = "device"
     _identifiers = ("company_name", "name")
-    _attributes = ("field_values",)
+    _attributes = ("asset_layout_id", "field_values")
 
     company_name: str
     name: str
+    asset_layout_id: int | None = None
     field_values: dict[str, str | None] = {}
 
 
@@ -115,7 +121,13 @@ class HuduDevice(Device):
 
     @classmethod
     def create(cls, adapter, ids, attrs):
-        """Create an Asset in Hudu under the right Company + asset_layout."""
+        """Create an Asset in Hudu under the right Company + asset_layout.
+
+        asset_layout_id comes from attrs (NautobotAdapter resolved it from
+        the device's role via device_layouts_by_role config). If unset, fall
+        back to the adapter-level default — but typically NautobotAdapter
+        skips devices it can't resolve, so this fallback is defensive.
+        """
         company = adapter.get("company", ids["company_name"])
         if company.pk is None:
             raise RuntimeError(
@@ -123,11 +135,18 @@ class HuduDevice(Device):
                 "parent Hudu Company has no pk (was it created in this same sync? "
                 "DiffSync ordering should have placed company creation first)."
             )
+        layout_id = attrs.get("asset_layout_id") or adapter.device_layout_id
+        if layout_id is None:
+            raise RuntimeError(
+                f"Cannot create device {ids['name']!r}: no asset_layout_id resolved "
+                "(device's role isn't in device_layouts_by_role and no default "
+                "asset_layouts.device is set)."
+            )
         custom_fields = _build_custom_fields_payload(attrs.get("field_values") or {})
         created = adapter.client.assets.create(
             company_id=company.pk,
             name=ids["name"],
-            asset_layout_id=adapter.device_layout_id,
+            asset_layout_id=layout_id,
             custom_fields=custom_fields,
         )
         instance = super().create(adapter, ids, attrs)
@@ -138,12 +157,20 @@ class HuduDevice(Device):
     def update(self, attrs):
         """Apply changed attrs to the Hudu Asset identified by self.pk.
 
-        Only ``field_values`` is in _attributes, so attrs only ever contains
-        that key; we rebuild the full custom_fields payload (not just the
-        changed fields) because Hudu's PUT semantics don't support sparse
-        per-field updates against the "leave omitted alone" default — we want
-        the post-update state to exactly match Nautobot's view.
+        Hudu's API does NOT support changing an existing asset's layout. If
+        the diff says the layout changed, log a warning and skip — operator
+        must migrate manually (delete + recreate). field_values updates
+        proceed normally.
         """
+        if "asset_layout_id" in attrs:
+            logger = getattr(getattr(self.adapter, "job", None), "logger", None)
+            msg = (
+                f"Device {self.company_name!r}/{self.name!r}: layout change "
+                f"detected (asset_layout_id) but Hudu does not support migrating "
+                f"existing assets between layouts. Skipping. Migrate manually."
+            )
+            if logger:
+                logger.warning(msg)
         if "field_values" in attrs:
             custom_fields = _build_custom_fields_payload(attrs["field_values"])
             self.adapter.client.assets.update(

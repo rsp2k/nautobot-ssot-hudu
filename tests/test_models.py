@@ -102,9 +102,10 @@ class TestDevice:
         assert Device._identifiers == ("company_name", "name")
 
     def test_attributes(self) -> None:
-        # field_values is the dict of Hudu custom-field label -> value pairs;
-        # both adapters populate it from the operator-configured field_map.
-        assert Device._attributes == ("field_values",)
+        # asset_layout_id is in _attributes so the diff surfaces layout drift
+        # (Hudu API can't migrate layouts; HuduDevice.update logs and skips).
+        # field_values is the per-field label -> value dict (operator-configured).
+        assert Device._attributes == ("asset_layout_id", "field_values")
 
     def test_construction_requires_company_and_name(self) -> None:
         with pytest.raises(ValidationError):
