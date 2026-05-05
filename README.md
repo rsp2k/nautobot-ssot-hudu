@@ -28,6 +28,7 @@ Nautobot ORM ──> Nautobot DiffSync adapter ─┐
 | `ipam.IPAddress` | IPAddress | ✅ address (host), dns_name, description |
 | `ipam.VLAN` | VLAN | ✅ vid (1-4094), name, description |
 | `dcim.Rack` | RackStorage | ✅ name, height (U), width (in), serial, asset_tag, description, desc_units |
+| `dcim.Device` rack/position/face | RackStorageItem | ✅ asset placement: rack_name, start_unit, end_unit, side |
 
 **Identity model:**
 - Companies match by `name` (globally unique on both sides)

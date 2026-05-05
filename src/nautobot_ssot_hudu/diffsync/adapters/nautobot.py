@@ -10,6 +10,7 @@ from nautobot_ssot_hudu.diffsync.models.device import Device as DeviceModel
 from nautobot_ssot_hudu.diffsync.models.ipaddress import IPAddress as IPAddressModel
 from nautobot_ssot_hudu.diffsync.models.network import Network as NetworkModel
 from nautobot_ssot_hudu.diffsync.models.rack import Rack as RackModel
+from nautobot_ssot_hudu.diffsync.models.rackitem import RackItem as RackItemModel
 from nautobot_ssot_hudu.diffsync.models.vlan import VLAN as VLANModel
 
 
@@ -37,8 +38,17 @@ class NautobotAdapter(Adapter):
     ipaddress = IPAddressModel
     vlan = VLANModel
     rack = RackModel
+    rackitem = RackItemModel
 
-    top_level = ("company", "device", "network", "ipaddress", "vlan", "rack")
+    top_level = (
+        "company",
+        "device",
+        "network",
+        "ipaddress",
+        "vlan",
+        "rack",
+        "rackitem",
+    )
 
     def __init__(
         self,
@@ -76,6 +86,7 @@ class NautobotAdapter(Adapter):
         self._load_ipaddresses()
         self._load_vlans()
         self._load_racks()
+        self._load_rack_items()
 
     def _load_companies(self) -> None:
         for tenant in Tenant.objects.all():
@@ -109,6 +120,29 @@ class NautobotAdapter(Adapter):
                     name=device.name,
                     asset_layout_id=layout_id,
                     field_values=field_values,
+                )
+            )
+
+    def _load_rack_items(self) -> None:
+        # Only Devices that are actually mounted: have rack + position + tenant.
+        # Devices with no rack assignment skip; they're not "rack items."
+        qs = Device.objects.filter(
+            tenant__isnull=False, rack__isnull=False, position__isnull=False
+        ).select_related("tenant", "rack", "device_type")
+        for device in qs:
+            u_height = getattr(device.device_type, "u_height", 1) or 1
+            start_unit = device.position
+            end_unit = start_unit + u_height - 1
+            # Nautobot's face is "front"/"rear" or empty string; default to front.
+            face = (device.face or "front").lower()
+            self.add(
+                self.rackitem(
+                    company_name=device.tenant.name,
+                    asset_name=device.name,
+                    rack_name=device.rack.name,
+                    start_unit=start_unit,
+                    end_unit=end_unit,
+                    side=face,
                 )
             )
 

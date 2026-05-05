@@ -14,6 +14,7 @@ from nautobot_ssot_hudu.diffsync.models.device import Device, HuduDevice
 from nautobot_ssot_hudu.diffsync.models.ipaddress import HuduIPAddress, IPAddress
 from nautobot_ssot_hudu.diffsync.models.network import HuduNetwork, Network
 from nautobot_ssot_hudu.diffsync.models.rack import HuduRack, Rack
+from nautobot_ssot_hudu.diffsync.models.rackitem import HuduRackItem, RackItem
 from nautobot_ssot_hudu.diffsync.models.vlan import VLAN, HuduVLAN
 
 
@@ -385,6 +386,77 @@ class TestHuduRack:
         instance = HuduRack(company_name="Acme", name="rack-01")
         assert instance.pk is None
         assert "pk" not in HuduRack._attributes
+
+
+class TestRackItem:
+    """RackItem — Device-in-Rack relationship (Nautobot Device.rack/pos/face)."""
+
+    def test_modelname(self) -> None:
+        assert RackItem._modelname == "rackitem"
+
+    def test_identifiers_one_per_asset(self) -> None:
+        # Each Asset can only be in one rack at a time, so the asset name
+        # within company is the natural identity.
+        assert RackItem._identifiers == ("company_name", "asset_name")
+
+    def test_attributes_includes_position_and_side(self) -> None:
+        assert RackItem._attributes == ("rack_name", "start_unit", "end_unit", "side")
+
+    def test_construction_requires_company_asset_rack_position(self) -> None:
+        with pytest.raises(ValidationError):
+            RackItem(asset_name="srv", rack_name="r", start_unit=1, end_unit=1)
+        with pytest.raises(ValidationError):
+            RackItem(company_name="Acme", rack_name="r", start_unit=1, end_unit=1)
+
+    def test_default_side_is_front(self) -> None:
+        # Most Nautobot Devices don't have face explicitly set; defaulting
+        # to front matches Nautobot's convention and Hudu's lowercase "front".
+        item = RackItem(
+            company_name="Acme", asset_name="srv", rack_name="r",
+            start_unit=1, end_unit=1,
+        )
+        assert item.side == "front"
+
+
+class TestHuduRackItem:
+    def test_inherits_from_rackitem(self) -> None:
+        assert issubclass(HuduRackItem, RackItem)
+
+    def test_keeps_identifiers_and_attributes(self) -> None:
+        assert HuduRackItem._identifiers == RackItem._identifiers
+        assert HuduRackItem._attributes == RackItem._attributes
+
+    def test_pk_is_optional_and_not_in_attributes(self) -> None:
+        from nautobot_ssot_hudu.diffsync.models.rackitem import HuduRackItem
+        instance = HuduRackItem(
+            company_name="Acme", asset_name="srv", rack_name="r",
+            start_unit=1, end_unit=1,
+        )
+        assert instance.pk is None
+        assert "pk" not in HuduRackItem._attributes
+
+    def test_lookup_asset_pk(self) -> None:
+        from unittest.mock import MagicMock
+
+        # MagicMock(name=...) sets the mock's repr name, not the attribute.
+        # Use plain assignment so .name returns our value.
+        def make(company, name, pk):
+            m = MagicMock()
+            m.company_name = company
+            m.name = name
+            m.pk = pk
+            return m
+
+        adapter = MagicMock()
+        adapter.get_all.return_value = [
+            make("Acme", "srv-1", 10),
+            make("Acme", "srv-2", 11),
+            make("Globex", "srv-1", 12),
+        ]
+        assert HuduRackItem._lookup_asset_pk(adapter, "Acme", "srv-1") == 10
+        # Same name in different company doesn't cross-match
+        assert HuduRackItem._lookup_asset_pk(adapter, "Acme", "srv-3") is None
+        assert HuduRackItem._lookup_asset_pk(adapter, "Globex", "srv-1") == 12
 
 
 class TestCustomFieldsHelpers:

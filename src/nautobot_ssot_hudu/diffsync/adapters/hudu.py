@@ -7,6 +7,7 @@ from nautobot_ssot_hudu.diffsync.models.device import HuduDevice
 from nautobot_ssot_hudu.diffsync.models.ipaddress import HuduIPAddress
 from nautobot_ssot_hudu.diffsync.models.network import HuduNetwork
 from nautobot_ssot_hudu.diffsync.models.rack import HuduRack
+from nautobot_ssot_hudu.diffsync.models.rackitem import HuduRackItem
 from nautobot_ssot_hudu.diffsync.models.vlan import HuduVLAN
 from nautobot_ssot_hudu.utils.hudu_client import build_client
 
@@ -20,8 +21,17 @@ class HuduAdapter(Adapter):
     ipaddress = HuduIPAddress
     vlan = HuduVLAN
     rack = HuduRack
+    rackitem = HuduRackItem
 
-    top_level = ("company", "device", "network", "ipaddress", "vlan", "rack")
+    top_level = (
+        "company",
+        "device",
+        "network",
+        "ipaddress",
+        "vlan",
+        "rack",
+        "rackitem",
+    )
 
     def __init__(
         self,
@@ -59,6 +69,7 @@ class HuduAdapter(Adapter):
         self._load_ipaddresses()
         self._load_vlans()
         self._load_racks()
+        self._load_rack_items()
 
     def _all_device_layout_ids(self) -> set[int]:
         """The union of layouts to load assets from: default + per-role values."""
@@ -141,6 +152,55 @@ class HuduAdapter(Adapter):
                     name=net.get("name") or address,
                     description=(net.get("description") or None),
                     pk=net.get("id"),
+                )
+            )
+
+    def _load_rack_items(self) -> None:
+        device_by_pk = {
+            d.pk: (d.company_name, d.name)
+            for d in self.get_all("device")
+            if d.pk is not None
+        }
+        rack_by_pk = {
+            r.pk: (r.company_name, r.name)
+            for r in self.get_all("rack")
+            if r.pk is not None
+        }
+        # Hudu's GET /rack_storage_items response is missing rack_storage_id
+        # — confirmed empirically against Hudu 2.40+. Reverse-look-up by
+        # walking each rack's front_items + rear_items (which DO include
+        # item ids and are returned in the rack list response). Single
+        # rack_storages.list() call gives us everything.
+        item_to_rack_pk: dict[int, int] = {}
+        for r in self.client.rack_storages.list() or []:
+            for slot in (getattr(r, "front_items", None) or []) + (
+                getattr(r, "rear_items", None) or []
+            ):
+                slot_item_id = slot.get("id") if isinstance(slot, dict) else None
+                if slot_item_id is not None:
+                    item_to_rack_pk[slot_item_id] = r.id
+
+        # Same pagination quirk as networks/ip_addresses/vlans on the items
+        # endpoint itself. Bypass with paginate=False.
+        for item in self.client.get("rack_storage_items", paginate=False) or []:
+            asset = device_by_pk.get(item.get("asset_id"))
+            if asset is None:
+                continue  # asset is in a layout we don't sync; skip
+            company_name, asset_name = asset
+            rack_pk = item_to_rack_pk.get(item["id"])
+            rack = rack_by_pk.get(rack_pk) if rack_pk else None
+            if rack is None:
+                continue  # rack not loaded (different company perhaps)
+            _, rack_name = rack
+            self.add(
+                self.rackitem(
+                    company_name=company_name,
+                    asset_name=asset_name,
+                    rack_name=rack_name,
+                    start_unit=item["start_unit"],
+                    end_unit=item["end_unit"],
+                    side=(item.get("side") or "front").lower(),
+                    pk=item["id"],
                 )
             )
 
