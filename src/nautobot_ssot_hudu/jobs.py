@@ -26,7 +26,16 @@ class HuduDataTarget(DataTarget):
 
     def load_source_adapter(self) -> None:
         """Load Nautobot data into the source DiffSync adapter."""
-        self.source_adapter = NautobotAdapter(job=self, sync=self.sync)
+        from django.conf import settings
+
+        plugin_cfg = settings.PLUGINS_CONFIG.get("nautobot_ssot_hudu", {})
+        device_field_map = plugin_cfg.get("device_field_map", {})
+
+        self.source_adapter = NautobotAdapter(
+            job=self,
+            sync=self.sync,
+            device_field_map=device_field_map,
+        )
         self.source_adapter.load()
 
     def load_target_adapter(self) -> None:
@@ -35,12 +44,14 @@ class HuduDataTarget(DataTarget):
 
         plugin_cfg = settings.PLUGINS_CONFIG.get("nautobot_ssot_hudu", {})
         device_layout_id = plugin_cfg.get("asset_layouts", {}).get("device")
+        device_field_map = plugin_cfg.get("device_field_map", {})
 
         self.target_adapter = HuduAdapter(
             job=self,
             sync=self.sync,
             hard_delete=self.hard_delete,
             device_layout_id=device_layout_id,
+            device_field_map=device_field_map,
         )
         self.target_adapter.load()
 

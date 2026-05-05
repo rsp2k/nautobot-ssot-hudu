@@ -33,5 +33,17 @@ PLUGINS_CONFIG = {
             if os.environ.get("HUDU_DEVICE_LAYOUT_ID")
             else None,
         },
+        # device_field_map: keys are Hudu custom-field labels (must exist on
+        # the device asset_layout); values are dotted attribute paths on the
+        # Nautobot Device. Resolved with safe None-propagation: a missing
+        # primary_ip4 yields None for "Management IP" rather than crashing.
+        "device_field_map": {
+            "Hostname": "name",
+            "Management IP": "primary_ip4.host",
+            "Model": "device_type.model",
+            "Serial": "serial",
+            "Status": "status.name",
+            "Location": "location.name",
+        },
     },
 }

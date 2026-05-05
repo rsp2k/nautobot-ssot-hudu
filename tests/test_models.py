@@ -100,7 +100,9 @@ class TestDevice:
         assert Device._identifiers == ("company_name", "name")
 
     def test_attributes(self) -> None:
-        assert Device._attributes == ("description",)
+        # field_values is the dict of Hudu custom-field label -> value pairs;
+        # both adapters populate it from the operator-configured field_map.
+        assert Device._attributes == ("field_values",)
 
     def test_construction_requires_company_and_name(self) -> None:
         with pytest.raises(ValidationError):
@@ -108,11 +110,32 @@ class TestDevice:
         with pytest.raises(ValidationError):
             Device(company_name="Acme")  # missing name
 
-    def test_construction_with_full_fields(self) -> None:
-        d = Device(company_name="Acme", name="edge-router-01", description="Edge router.")
-        assert d.company_name == "Acme"
-        assert d.name == "edge-router-01"
-        assert d.description == "Edge router."
+    def test_field_values_defaults_to_empty_dict(self) -> None:
+        d = Device(company_name="Acme", name="edge-01")
+        assert d.field_values == {}
+
+    def test_field_values_accepts_label_value_dict(self) -> None:
+        d = Device(
+            company_name="Acme",
+            name="edge-01",
+            field_values={
+                "Hostname": "edge-01.acme.lan",
+                "Management IP": "10.0.0.1",
+                "Serial": None,  # null is allowed for unset fields
+            },
+        )
+        assert d.field_values["Hostname"] == "edge-01.acme.lan"
+        assert d.field_values["Management IP"] == "10.0.0.1"
+        assert d.field_values["Serial"] is None
+
+    def test_field_values_dict_equality_is_order_independent(self) -> None:
+        # CRITICAL: DiffSync compares attributes with ==, and Python dict
+        # equality is set-of-(k,v) — order-independent. If this ever stopped
+        # being true (e.g. someone changed field_values to a list of tuples)
+        # the diff would emit spurious updates whenever the load order shifted.
+        a = Device(company_name="Acme", name="x", field_values={"A": "1", "B": "2"})
+        b = Device(company_name="Acme", name="x", field_values={"B": "2", "A": "1"})
+        assert a.field_values == b.field_values
 
 
 class TestHuduDevice:
@@ -132,7 +155,40 @@ class TestHuduDevice:
         assert instance.pk is None
         assert "pk" not in HuduDevice._attributes
 
+    def test_company_pk_is_optional_int_not_in_attributes(self) -> None:
+        # company_pk is captured at load time and used by update() to hit the
+        # per-company Hudu endpoint. Like pk, it's metadata and must not be
+        # part of the diff — otherwise a Hudu Company id renumbering would
+        # show every device as needing update.
+        instance = HuduDevice(company_name="Acme", name="edge-01")
+        assert instance.company_pk is None
+        assert "company_pk" not in HuduDevice._attributes
+
     def test_crud_methods_exist(self) -> None:
         assert hasattr(HuduDevice, "create")
         assert hasattr(HuduDevice, "update")
         assert hasattr(HuduDevice, "delete")
+
+
+class TestCustomFieldsHelpers:
+    """Helpers that translate between our field_values dict and Hudu's API format."""
+
+    def test_label_to_field_key_lowercases_and_underscores(self) -> None:
+        from nautobot_ssot_hudu.diffsync.models.company import _label_to_field_key
+
+        assert _label_to_field_key("Hostname") == "hostname"
+        assert _label_to_field_key("Management IP") == "management_ip"
+        assert _label_to_field_key("Serial Number") == "serial_number"
+
+    def test_build_custom_fields_payload_includes_none_values(self) -> None:
+        # CRITICAL: None must be included so the diff can explicitly clear a
+        # field. Omitting it would let Hudu retain the previous value, and
+        # the diff would loop forever wanting to set it to None.
+        from nautobot_ssot_hudu.diffsync.models.company import (
+            _build_custom_fields_payload,
+        )
+
+        payload = _build_custom_fields_payload(
+            {"Hostname": "edge-01", "Serial": None},
+        )
+        assert payload == [{"hostname": "edge-01"}, {"serial": None}]

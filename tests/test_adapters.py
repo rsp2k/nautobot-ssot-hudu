@@ -77,6 +77,44 @@ class TestNautobotAdapter:
         assert list(adapter.get_all("company")) == []
 
 
+class TestNautobotAdapterFieldResolution:
+    """The dotted-path attribute resolver used to populate device field_values."""
+
+    def test_simple_attribute(self) -> None:
+        from nautobot_ssot_hudu.diffsync.adapters.nautobot import NautobotAdapter
+
+        device = _make_obj(name="edge-01")
+        assert NautobotAdapter._resolve_field_value(device, "name") == "edge-01"
+
+    def test_dotted_path(self) -> None:
+        from nautobot_ssot_hudu.diffsync.adapters.nautobot import NautobotAdapter
+
+        device = _make_obj(device_type=_make_obj(model="ISR4321"))
+        assert NautobotAdapter._resolve_field_value(device, "device_type.model") == "ISR4321"
+
+    def test_none_propagates_through_dotted_path(self) -> None:
+        from nautobot_ssot_hudu.diffsync.adapters.nautobot import NautobotAdapter
+
+        # Device without primary_ip4 → primary_ip4 is None → no AttributeError,
+        # just returns None for the whole path.
+        device = _make_obj(primary_ip4=None)
+        assert NautobotAdapter._resolve_field_value(device, "primary_ip4.host") is None
+
+    def test_empty_string_coerced_to_none(self) -> None:
+        from nautobot_ssot_hudu.diffsync.adapters.nautobot import NautobotAdapter
+
+        # CharField defaults are "" but Hudu stores unset as null. Without
+        # coercion every sync would emit spurious updates for blank fields.
+        device = _make_obj(serial="")
+        assert NautobotAdapter._resolve_field_value(device, "serial") is None
+
+    def test_real_value_passes_through(self) -> None:
+        from nautobot_ssot_hudu.diffsync.adapters.nautobot import NautobotAdapter
+
+        device = _make_obj(serial="FOC1234XYZ")
+        assert NautobotAdapter._resolve_field_value(device, "serial") == "FOC1234XYZ"
+
+
 class TestHuduAdapter:
     """HuduAdapter._load_companies coercion + pk capture."""
 

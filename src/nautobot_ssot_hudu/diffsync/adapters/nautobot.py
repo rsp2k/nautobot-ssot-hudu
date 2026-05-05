@@ -8,6 +8,21 @@ from nautobot_ssot_hudu.diffsync.models.company import Company
 from nautobot_ssot_hudu.diffsync.models.company import Device as DeviceModel
 
 
+def _resolve_attr_path(obj, path: str):
+    """Walk a dotted attribute path, returning None at any None hop.
+
+    For ``device_field_map = {"Management IP": "primary_ip4.host"}`` we want
+    ``getattr(getattr(device, "primary_ip4", None), "host", None)`` with safe
+    None-propagation — a Device without a primary IP yields None for that
+    field rather than crashing on AttributeError.
+    """
+    for part in path.split("."):
+        if obj is None:
+            return None
+        obj = getattr(obj, part, None)
+    return obj
+
+
 class NautobotAdapter(Adapter):
     """Load Nautobot ORM data into DiffSync models."""
 
@@ -16,11 +31,25 @@ class NautobotAdapter(Adapter):
 
     top_level = ("company", "device")
 
-    def __init__(self, *args, job=None, sync=None, **kwargs) -> None:
-        """Store the Job and Sync references for logging and progress."""
+    def __init__(
+        self,
+        *args,
+        job=None,
+        sync=None,
+        device_field_map: dict[str, str] | None = None,
+        **kwargs,
+    ) -> None:
+        """Store Job, Sync, and optional device field mapping config.
+
+        ``device_field_map`` maps Hudu custom-field labels to Nautobot Device
+        attribute paths (e.g. ``{"Management IP": "primary_ip4.host"}``). Both
+        adapters in a sync session must be initialized with the same map so
+        their loaded ``field_values`` dicts have matching keys for diffing.
+        """
         super().__init__(*args, **kwargs)
         self.job = job
         self.sync = sync
+        self.device_field_map = device_field_map or {}
 
     def load(self) -> None:
         """Populate DiffSync models from the Nautobot ORM."""
@@ -42,10 +71,29 @@ class NautobotAdapter(Adapter):
         # requires a parent Hudu Company. Tenant-less Nautobot Devices have
         # no natural home in Hudu's company-scoped model and are skipped.
         for device in Device.objects.filter(tenant__isnull=False).select_related("tenant"):
+            field_values = {
+                label: self._resolve_field_value(device, attr_path)
+                for label, attr_path in self.device_field_map.items()
+            }
             self.add(
                 self.device(
                     company_name=device.tenant.name,
                     name=device.name,
-                    description=None,  # Nautobot Device has no description field; placeholder.
+                    field_values=field_values,
                 )
             )
+
+    @staticmethod
+    def _resolve_field_value(device, attr_path: str) -> str | None:
+        """Resolve a configured Nautobot attr path to a string for the diff.
+
+        Empty string is coerced to None so the diff is stable: Hudu stores
+        unset fields as null, Nautobot's CharField defaults are often "" —
+        without this coercion every sync would emit a spurious update for
+        any blank field.
+        """
+        value = _resolve_attr_path(device, attr_path)
+        if value is None:
+            return None
+        str_value = str(value)
+        return str_value or None
