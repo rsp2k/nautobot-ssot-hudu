@@ -6,8 +6,8 @@ from nautobot.ipam.models import Prefix
 from nautobot.tenancy.models import Tenant
 
 from nautobot_ssot_hudu.diffsync.models.company import Company
-from nautobot_ssot_hudu.diffsync.models.company import Device as DeviceModel
-from nautobot_ssot_hudu.diffsync.models.company import Network as NetworkModel
+from nautobot_ssot_hudu.diffsync.models.device import Device as DeviceModel
+from nautobot_ssot_hudu.diffsync.models.network import Network as NetworkModel
 
 
 def _resolve_attr_path(obj, path: str):

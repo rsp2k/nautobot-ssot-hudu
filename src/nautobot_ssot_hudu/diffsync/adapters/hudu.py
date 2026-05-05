@@ -2,11 +2,9 @@
 
 from diffsync import Adapter
 
-from nautobot_ssot_hudu.diffsync.models.company import (
-    HuduCompany,
-    HuduDevice,
-    HuduNetwork,
-)
+from nautobot_ssot_hudu.diffsync.models.company import HuduCompany
+from nautobot_ssot_hudu.diffsync.models.device import HuduDevice
+from nautobot_ssot_hudu.diffsync.models.network import HuduNetwork
 from nautobot_ssot_hudu.utils.hudu_client import build_client
 
 

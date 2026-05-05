@@ -9,14 +9,9 @@ real model definitions but stub out Nautobot framework imports (see
 import pytest
 from pydantic import ValidationError
 
-from nautobot_ssot_hudu.diffsync.models.company import (
-    Company,
-    Device,
-    HuduCompany,
-    HuduDevice,
-    HuduNetwork,
-    Network,
-)
+from nautobot_ssot_hudu.diffsync.models.company import Company, HuduCompany
+from nautobot_ssot_hudu.diffsync.models.device import Device, HuduDevice
+from nautobot_ssot_hudu.diffsync.models.network import HuduNetwork, Network
 
 
 class TestCompany:
@@ -231,7 +226,7 @@ class TestCustomFieldsHelpers:
     """Helpers that translate between our field_values dict and Hudu's API format."""
 
     def test_label_to_field_key_lowercases_and_underscores(self) -> None:
-        from nautobot_ssot_hudu.diffsync.models.company import _label_to_field_key
+        from nautobot_ssot_hudu.diffsync.models.device import _label_to_field_key
 
         assert _label_to_field_key("Hostname") == "hostname"
         assert _label_to_field_key("Management IP") == "management_ip"
@@ -241,7 +236,7 @@ class TestCustomFieldsHelpers:
         # CRITICAL: None must be included so the diff can explicitly clear a
         # field. Omitting it would let Hudu retain the previous value, and
         # the diff would loop forever wanting to set it to None.
-        from nautobot_ssot_hudu.diffsync.models.company import (
+        from nautobot_ssot_hudu.diffsync.models.device import (
             _build_custom_fields_payload,
         )
 
