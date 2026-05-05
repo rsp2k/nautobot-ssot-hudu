@@ -23,8 +23,8 @@ Nautobot ORM ──> Nautobot DiffSync adapter ─┐
 | Nautobot | Hudu | Status |
 |---|---|---|
 | `tenancy.Tenant` | Company | ✅ name, description (notes) |
-| `dcim.Device` | Asset (configurable layout + custom field map) | ✅ name + configurable custom-field map |
-| `ipam.Prefix` | (TBD) | not started |
+| `dcim.Device` | Asset (per-role layouts + configurable custom field map) | ✅ name + custom-field map + role-based layout selection |
+| `ipam.Prefix` | Network | ✅ address (CIDR), name, description |
 | `ipam.IPAddress` | (TBD) | not started |
 
 **Identity model:**
