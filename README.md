@@ -20,12 +20,45 @@ Nautobot ORM ──> Nautobot DiffSync adapter ─┐
 
 ## Mapping
 
-| Nautobot | Hudu |
-|---|---|
-| `tenancy.Tenant` | Company |
-| `dcim.Device` | Asset (configurable layout) |
-| `ipam.Prefix` | (TBD) |
-| `ipam.IPAddress` | (TBD) |
+| Nautobot | Hudu | Status |
+|---|---|---|
+| `tenancy.Tenant` | Company | ✅ name, description (notes) |
+| `dcim.Device` | Asset (configurable layout + custom field map) | ✅ name + configurable custom-field map |
+| `ipam.Prefix` | (TBD) | not started |
+| `ipam.IPAddress` | (TBD) | not started |
+
+**Identity model:**
+- Companies match by `name` (globally unique on both sides)
+- Devices match by `(company_name, name)` composite — Hudu Asset names are unique only within a company
+
+**Empty-string normalization:** Both adapters coerce empty string `""` to `None` when loading. Hudu stores unset fields as null; Nautobot `CharField` defaults are `""`. Without coercion every sync would emit spurious updates for blank fields.
+
+## Device custom field mapping
+
+Operators choose which Nautobot Device attributes populate which Hudu custom-layout fields via PLUGINS_CONFIG:
+
+```python
+PLUGINS_CONFIG = {
+    "nautobot_ssot_hudu": {
+        "instance_url": "https://acme.huducloud.com",
+        "secret_group_name": "Hudu Credentials",
+        "asset_layouts": {
+            "device": 7,  # Hudu asset_layout_id
+        },
+        # Hudu field label -> Nautobot Device attribute path (dotted)
+        "device_field_map": {
+            "Hostname": "name",
+            "Management IP": "primary_ip4.host",
+            "Model": "device_type.model",
+            "Serial": "serial",
+            "Status": "status.name",
+            "Location": "location.name",
+        },
+    }
+}
+```
+
+The Hudu asset_layout must already have custom fields with matching labels. Field-resolution uses safe None-propagation: a Device without a `primary_ip4` yields `None` for "Management IP" rather than raising `AttributeError`.
 
 ## Configuration
 
