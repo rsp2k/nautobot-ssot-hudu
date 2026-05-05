@@ -14,6 +14,8 @@ from nautobot_ssot_hudu.diffsync.models.company import (
     Device,
     HuduCompany,
     HuduDevice,
+    HuduNetwork,
+    Network,
 )
 
 
@@ -168,6 +170,60 @@ class TestHuduDevice:
         assert hasattr(HuduDevice, "create")
         assert hasattr(HuduDevice, "update")
         assert hasattr(HuduDevice, "delete")
+
+
+class TestNetwork:
+    """Network model — Hudu Networks are CIDR blocks scoped per-company."""
+
+    def test_modelname(self) -> None:
+        assert Network._modelname == "network"
+
+    def test_identifiers_is_company_and_address(self) -> None:
+        # Hudu allows the same CIDR (e.g. 10.0.0.0/24) in multiple companies,
+        # so identity must be composite to match across both adapters correctly.
+        assert Network._identifiers == ("company_name", "address")
+
+    def test_attributes(self) -> None:
+        assert Network._attributes == ("name", "description")
+
+    def test_construction_requires_company_and_address(self) -> None:
+        with pytest.raises(ValidationError):
+            Network(address="10.0.0.0/24")  # missing company_name
+        with pytest.raises(ValidationError):
+            Network(company_name="Acme")  # missing address
+
+    def test_construction_with_full_fields(self) -> None:
+        n = Network(
+            company_name="Acme",
+            address="10.0.0.0/24",
+            name="LAN",
+            description="Office LAN.",
+        )
+        assert n.company_name == "Acme"
+        assert n.address == "10.0.0.0/24"
+        assert n.name == "LAN"
+        assert n.description == "Office LAN."
+
+
+class TestHuduNetwork:
+    """Hudu-side Network variant: same schema + pk + CRUD."""
+
+    def test_inherits_from_network(self) -> None:
+        assert issubclass(HuduNetwork, Network)
+
+    def test_keeps_identifiers_and_attributes(self) -> None:
+        assert HuduNetwork._identifiers == Network._identifiers
+        assert HuduNetwork._attributes == Network._attributes
+
+    def test_pk_is_optional_and_not_in_attributes(self) -> None:
+        instance = HuduNetwork(company_name="Acme", address="10.0.0.0/24")
+        assert instance.pk is None
+        assert "pk" not in HuduNetwork._attributes
+
+    def test_crud_methods_exist(self) -> None:
+        assert hasattr(HuduNetwork, "create")
+        assert hasattr(HuduNetwork, "update")
+        assert hasattr(HuduNetwork, "delete")
 
 
 class TestCustomFieldsHelpers:

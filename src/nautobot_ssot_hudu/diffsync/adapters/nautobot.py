@@ -2,10 +2,12 @@
 
 from diffsync import Adapter
 from nautobot.dcim.models import Device
+from nautobot.ipam.models import Prefix
 from nautobot.tenancy.models import Tenant
 
 from nautobot_ssot_hudu.diffsync.models.company import Company
 from nautobot_ssot_hudu.diffsync.models.company import Device as DeviceModel
+from nautobot_ssot_hudu.diffsync.models.company import Network as NetworkModel
 
 
 def _resolve_attr_path(obj, path: str):
@@ -28,8 +30,9 @@ class NautobotAdapter(Adapter):
 
     company = Company
     device = DeviceModel
+    network = NetworkModel
 
-    top_level = ("company", "device")
+    top_level = ("company", "device", "network")
 
     def __init__(
         self,
@@ -55,6 +58,7 @@ class NautobotAdapter(Adapter):
         """Populate DiffSync models from the Nautobot ORM."""
         self._load_companies()
         self._load_devices()
+        self._load_prefixes()
 
     def _load_companies(self) -> None:
         for tenant in Tenant.objects.all():
@@ -80,6 +84,21 @@ class NautobotAdapter(Adapter):
                     company_name=device.tenant.name,
                     name=device.name,
                     field_values=field_values,
+                )
+            )
+
+    def _load_prefixes(self) -> None:
+        # Same tenant-scoped filter as devices: a prefix without a tenant
+        # has no parent Hudu Company to attach to.
+        for prefix in Prefix.objects.filter(tenant__isnull=False).select_related("tenant"):
+            self.add(
+                self.network(
+                    company_name=prefix.tenant.name,
+                    address=str(prefix.prefix),
+                    # Nautobot Prefix has no first-class name field; derive one
+                    # from the CIDR so Hudu has something readable to display.
+                    name=str(prefix.prefix),
+                    description=prefix.description or None,
                 )
             )
 

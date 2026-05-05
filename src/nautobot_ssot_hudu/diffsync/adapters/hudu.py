@@ -2,7 +2,11 @@
 
 from diffsync import Adapter
 
-from nautobot_ssot_hudu.diffsync.models.company import HuduCompany, HuduDevice
+from nautobot_ssot_hudu.diffsync.models.company import (
+    HuduCompany,
+    HuduDevice,
+    HuduNetwork,
+)
 from nautobot_ssot_hudu.utils.hudu_client import build_client
 
 
@@ -11,8 +15,9 @@ class HuduAdapter(Adapter):
 
     company = HuduCompany
     device = HuduDevice
+    network = HuduNetwork
 
-    top_level = ("company", "device")
+    top_level = ("company", "device", "network")
 
     def __init__(
         self,
@@ -48,6 +53,7 @@ class HuduAdapter(Adapter):
         self._load_companies()
         if self.device_layout_id is not None:
             self._load_devices()
+        self._load_networks()
 
     def _load_companies(self) -> None:
         for company in self.client.companies.list():
@@ -95,5 +101,30 @@ class HuduAdapter(Adapter):
                     field_values=field_values,
                     pk=asset.id,
                     company_pk=asset.company_id,
+                )
+            )
+
+    def _load_networks(self) -> None:
+        company_name_by_pk = {
+            c.pk: c.name for c in self.get_all("company") if c.pk is not None
+        }
+        # hudu-magic's `c.networks.list()` auto-appends `?page=1` for
+        # pagination but Hudu's /api/v1/networks endpoint rejects `page` as
+        # an invalid filter param (HTTP 400). Bypass by going through
+        # HuduClient.get directly with paginate=False, which returns a list
+        # of raw dicts instead of the wrapped objects.
+        for net in self.client.get("networks", paginate=False) or []:
+            company_pk = net.get("company_id")
+            company_name = company_name_by_pk.get(company_pk)
+            if company_name is None:
+                continue  # archived/missing parent
+            address = net.get("address")
+            self.add(
+                self.network(
+                    company_name=company_name,
+                    address=address,
+                    name=net.get("name") or address,
+                    description=(net.get("description") or None),
+                    pk=net.get("id"),
                 )
             )
