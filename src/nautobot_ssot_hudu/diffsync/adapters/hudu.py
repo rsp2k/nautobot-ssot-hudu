@@ -26,9 +26,10 @@ class HuduAdapter(Adapter):
     top_level = (
         "company",
         "device",
+        # vlan before network so Network -> VLAN linkage resolves at write time
+        "vlan",
         "network",
         "ipaddress",
-        "vlan",
         "rack",
         "rackitem",
     )
@@ -65,9 +66,11 @@ class HuduAdapter(Adapter):
         self._load_companies()
         if self._all_device_layout_ids():
             self._load_devices()
+        # VLANs before Networks so Network's vlan_vid linkage can resolve
+        # via reverse lookup against loaded HuduVLAN records.
+        self._load_vlans()
         self._load_networks()
         self._load_ipaddresses()
-        self._load_vlans()
         self._load_racks()
         self._load_rack_items()
 
@@ -139,18 +142,27 @@ class HuduAdapter(Adapter):
         # an invalid filter param (HTTP 400). Bypass by going through
         # HuduClient.get directly with paginate=False, which returns a list
         # of raw dicts instead of the wrapped objects.
+        # Reverse-lookup map for the optional VLAN linkage on Networks:
+        # Hudu returns vlan_id (the VLAN pk); we translate to vlan_vid (the
+        # 802.1Q tag) so the diff aligns with the Nautobot side which has
+        # vid not pk.
+        vid_by_vlan_pk = {
+            v.pk: v.vid for v in self.get_all("vlan") if v.pk is not None
+        }
         for net in self.client.get("networks", paginate=False) or []:
             company_pk = net.get("company_id")
             company_name = company_name_by_pk.get(company_pk)
             if company_name is None:
                 continue  # archived/missing parent
             address = net.get("address")
+            vlan_pk = net.get("vlan_id")
             self.add(
                 self.network(
                     company_name=company_name,
                     address=address,
                     name=net.get("name") or address,
                     description=(net.get("description") or None),
+                    vlan_vid=vid_by_vlan_pk.get(vlan_pk) if vlan_pk else None,
                     pk=net.get("id"),
                 )
             )
@@ -254,18 +266,26 @@ class HuduAdapter(Adapter):
         company_name_by_pk = {
             c.pk: c.name for c in self.get_all("company") if c.pk is not None
         }
+        # Reverse-lookup for the optional Asset linkage on IPs: Hudu returns
+        # asset_id; we translate to asset_name so the diff aligns with the
+        # Nautobot side (which works in names not pks).
+        name_by_asset_pk = {
+            d.pk: d.name for d in self.get_all("device") if d.pk is not None
+        }
         # Same pagination quirk as networks: ip_addresses endpoint rejects
         # the `page` query param hudu-magic auto-adds. Bypass with paginate=False.
         for ip in self.client.get("ip_addresses", paginate=False) or []:
             company_name = company_name_by_pk.get(ip.get("company_id"))
             if company_name is None:
                 continue
+            asset_pk = ip.get("asset_id")
             self.add(
                 self.ipaddress(
                     company_name=company_name,
                     address=ip.get("address"),
                     dns_name=(ip.get("fqdn") or None),
                     description=(ip.get("description") or None),
+                    asset_name=name_by_asset_pk.get(asset_pk) if asset_pk else None,
                     pk=ip.get("id"),
                 )
             )

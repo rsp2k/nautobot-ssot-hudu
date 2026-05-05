@@ -184,7 +184,8 @@ class TestNetwork:
         assert Network._identifiers == ("company_name", "address")
 
     def test_attributes(self) -> None:
-        assert Network._attributes == ("name", "description")
+        # vlan_vid links the Network to a VLAN by 802.1Q tag (not pk).
+        assert Network._attributes == ("name", "description", "vlan_vid")
 
     def test_construction_requires_company_and_address(self) -> None:
         with pytest.raises(ValidationError):
@@ -236,7 +237,9 @@ class TestIPAddress:
         assert IPAddress._identifiers == ("company_name", "address")
 
     def test_attributes(self) -> None:
-        assert IPAddress._attributes == ("dns_name", "description")
+        # asset_name links the IP to a Hudu Asset by name (not pk) — diff
+        # stays stable across asset recreation.
+        assert IPAddress._attributes == ("dns_name", "description", "asset_name")
 
     def test_construction_requires_company_and_address(self) -> None:
         with pytest.raises(ValidationError):

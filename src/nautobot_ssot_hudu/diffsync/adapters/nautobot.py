@@ -43,9 +43,10 @@ class NautobotAdapter(Adapter):
     top_level = (
         "company",
         "device",
+        # vlan before network so Network -> VLAN linkage can resolve at write time
+        "vlan",
         "network",
         "ipaddress",
-        "vlan",
         "rack",
         "rackitem",
     )
@@ -82,9 +83,10 @@ class NautobotAdapter(Adapter):
         """Populate DiffSync models from the Nautobot ORM."""
         self._load_companies()
         self._load_devices()
+        # VLANs before Prefixes so prefix.vlan resolution has someone to ref.
+        self._load_vlans()
         self._load_prefixes()
         self._load_ipaddresses()
-        self._load_vlans()
         self._load_racks()
         self._load_rack_items()
 
@@ -183,8 +185,30 @@ class NautobotAdapter(Adapter):
                     address=str(ip.host),
                     dns_name=ip.dns_name or None,
                     description=ip.description or None,
+                    asset_name=self._resolve_ip_assigned_device(ip),
                 )
             )
+
+    @staticmethod
+    def _resolve_ip_assigned_device(ip) -> str | None:
+        """Return the name of the Device this IP is assigned to.
+
+        Nautobot 3.x uses an IPAddressToInterface through-model exposed as
+        ``ip.interface_assignments``; pick the first assignment defensively
+        (multi-assignment is rare and ambiguous).
+        """
+        try:
+            assignments = ip.interface_assignments.all()
+        except AttributeError:
+            return None
+        first = assignments.first() if hasattr(assignments, "first") else None
+        if first is None:
+            return None
+        interface = getattr(first, "interface", None)
+        if interface is None:
+            return None
+        device = getattr(interface, "device", None)
+        return getattr(device, "name", None)
 
     def _resolve_layout_id(self, device) -> int | None:
         # Per-role override wins over the default. Role name matching is
@@ -198,7 +222,10 @@ class NautobotAdapter(Adapter):
     def _load_prefixes(self) -> None:
         # Same tenant-scoped filter as devices: a prefix without a tenant
         # has no parent Hudu Company to attach to.
-        for prefix in Prefix.objects.filter(tenant__isnull=False).select_related("tenant"):
+        qs = Prefix.objects.filter(tenant__isnull=False).select_related(
+            "tenant", "vlan"
+        )
+        for prefix in qs:
             self.add(
                 self.network(
                     company_name=prefix.tenant.name,
@@ -207,6 +234,9 @@ class NautobotAdapter(Adapter):
                     # from the CIDR so Hudu has something readable to display.
                     name=str(prefix.prefix),
                     description=prefix.description or None,
+                    # VLAN linkage: vid is the 802.1Q tag, not the Hudu pk.
+                    # HuduNetwork.create resolves vid → Hudu VLAN pk at write.
+                    vlan_vid=prefix.vlan.vid if prefix.vlan else None,
                 )
             )
 
