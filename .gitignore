@@ -43,3 +43,6 @@ uv.lock
 /local/
 nautobot.db
 media/
+
+# Built mkdocs site (per Nautobot convention; rebuilt by CI/release process)
+src/nautobot_ssot_hudu/static/nautobot_ssot_hudu/docs/

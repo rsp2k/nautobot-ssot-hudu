@@ -31,6 +31,11 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.6",
 ]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocs-glightbox>=0.4",
+]
 
 [project.urls]
 Homepage = "https://github.com/rsp/nautobot-plugin-ssot-hudu"
