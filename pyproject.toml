@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 authors = [{ name = "Ryan Malloy", email = "ryan@supported.systems" }]
 keywords = ["nautobot", "nautobot-app", "nautobot-plugin", "ssot", "hudu", "diffsync"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: System Administrators",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",

@@ -2,7 +2,7 @@
 
 A Hudu instance for testing the `nautobot-ssot-hudu` plugin. Adapts Hudu's official self-hosted compose by **removing the bundled nginx** and reverse-proxying through your existing `caddy-docker-proxy` + LetsEncrypt setup.
 
-> **Location note:** This lives in the plugin repo for now. If you keep Hudu past the trial, consider moving to `~/bingham/hudu/` to sit alongside `~/bingham/nautobot/`.
+> **Location note:** This lives in the plugin repo for now. If you keep Hudu past the trial, consider moving to `~/your-stacks/hudu/` to sit alongside `~/your-stacks/nautobot/`.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ Once the app is up, visit `https://${DOMAIN}/` — you should see Hudu's first-r
 
 ## License key
 
-1. Go to https://hq.hudu.com/ and sign in (Bing Man / Bingham account — see `.hudu-account.local` for credentials)
+1. Go to https://hq.hudu.com/ and sign in (your Hudu HQ account)
 2. Navigate to the trial-start page → "Get Started!" → generates a license key
 3. Paste the key into Hudu's first-run prompt
 4. Create the admin user when asked
