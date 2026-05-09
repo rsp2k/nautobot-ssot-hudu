@@ -26,7 +26,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-See [`development/hudu/README.md`](https://github.com/rpm/nautobot-plugin-ssot-hudu/blob/main/development/hudu/README.md) for the full bringup, including the license-key flow.
+See [`development/hudu/README.md`](https://github.com/rsp2k/nautobot-ssot-hudu/blob/main/development/hudu/README.md) for the full bringup, including the license-key flow.
 
 ## Tests
 

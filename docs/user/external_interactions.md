@@ -80,7 +80,7 @@ Custom fields are passed as a list of single-key dicts with snake-cased label na
 
 Hudu auto-derives the snake_case form from the human-readable label. GET responses return Title-Case labels in a `fields` array.
 
-For the full discussion see the in-repo [HUDU_API_QUIRKS.md](https://github.com/rpm/nautobot-plugin-ssot-hudu/blob/main/development/hudu/HUDU_API_QUIRKS.md).
+For the full discussion see the in-repo [HUDU_API_QUIRKS.md](https://github.com/rsp2k/nautobot-ssot-hudu/blob/main/development/hudu/HUDU_API_QUIRKS.md).
 
 ## What the plugin does NOT do
 

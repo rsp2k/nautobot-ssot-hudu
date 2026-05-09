@@ -32,7 +32,7 @@ See [Extending the App](extending.md) for the full walkthrough. Briefly:
 
 ## Reporting Hudu API quirks
 
-If you find a Hudu behavior we don't already work around, please document it in [`development/hudu/HUDU_API_QUIRKS.md`](https://github.com/rpm/nautobot-plugin-ssot-hudu/blob/main/development/hudu/HUDU_API_QUIRKS.md) as part of the PR. The pattern is:
+If you find a Hudu behavior we don't already work around, please document it in [`development/hudu/HUDU_API_QUIRKS.md`](https://github.com/rsp2k/nautobot-ssot-hudu/blob/main/development/hudu/HUDU_API_QUIRKS.md) as part of the PR. The pattern is:
 
 1. Brief description of the behavior
 2. The endpoint(s) it affects

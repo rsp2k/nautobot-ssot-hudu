@@ -38,7 +38,7 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rsp/nautobot-plugin-ssot-hudu"
+Homepage = "https://github.com/rsp2k/nautobot-ssot-hudu"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nautobot_ssot_hudu"]
